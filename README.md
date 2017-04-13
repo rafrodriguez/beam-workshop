@@ -48,7 +48,8 @@ To view the Apache Flink UI, in another terminal:
 
     gcloud compute ssh --zone=us-central1-f --ssh-flag="-D 1081" --ssh-flag="-N" --ssh-flag="-n" gaming-flink-m
 
-Launch magic Google Chrome window and, if applicable, set BeyondCorp to System/Alternative:
+Launch magic Google Chrome window and, if applicable, set BeyondCorp to
+System/Alternative:
 
     /Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome \
       --proxy-server="socks5://localhost:1081" \
@@ -59,27 +60,25 @@ Open the UI:
 
     http://gaming-flink-m:8088/
 
+In the Flink UI, capture values of `jobmanager.rpc.address` and
+`jobmanager.rpc.port` in the Job Manager configuration.
+
+In another terminal, set up an SSH tunnel to the machine in the cluster running
+the Flink Job Manager:
+
+    gcloud compute ssh gaming-flink-w-6 --zone us-central1-f --ssh-flag="-D 1082"
+
 Build the package and stage it in Google Cloud Storage:
 
-    mvn clean package -Pflink-runner
-    gsutil cp ./target/portability-demo-bundled-flink.jar gs://apache-beam-demo-davor/staging/
-
-On the Flink master VM:
-
-    screen
-    yarn application -list
-    gsutil cp gs://apache-beam-demo-davor/staging/portability-demo-bundled-flink.jar .
-
-    /usr/lib/flink/bin/flink run \
-        -yid application_1490674683453_0001 \
-        -c demo.HourlyTeamScore
-        portability-demo-bundled-flink.jar \
-        --runner=flink \
-        --outputPrefix=gs://apache-beam-demo-davor/flink/hourly/scores \
-        --input=gs://apache-beam-demo/data/gaming*
-    
-    /usr/lib/flink/bin/flink cancel \
-        -yid application_1488916342230_0001
+    mvn clean package exec:java -Pflink-runner \
+        -DsocksProxyHost=localhost \
+        -DsocksProxyPort=1082 \
+        -Dexec.mainClass="demo.HourlyTeamScore" \
+        -Dexec.args="--runner=flink \
+                     --input=gs://apache-beam-demo/data/gaming* \
+                     --outputPrefix=gs://apache-beam-demo-davor/flink/hourly/scores \
+                     --filesToStage=target/portability-demo-bundled-flink.jar \
+                     --flinkMaster=gaming-flink-w-6.c.apache-beam-demo.internal:52871"
 
 ## Apache Spark cluster in Google Cloud Dataproc
 
@@ -96,7 +95,8 @@ To view the Apache Spark UI, in another terminal:
 
     gcloud compute ssh --zone=us-central1-f --ssh-flag="-D 1080" --ssh-flag="-N" --ssh-flag="-n" gaming-spark-m
 
-Launch magic Google Chrome window and, if applicable, set BeyondCorp to System/Alternative:
+Launch magic Google Chrome window and, if applicable, set BeyondCorp to
+System/Alternative:
 
     /Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome \
         --proxy-server="socks5://localhost:1080" \
