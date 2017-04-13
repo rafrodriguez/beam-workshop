@@ -238,6 +238,9 @@
                      </excludes>
                    </filter>
                  </filters>
+                 <transformers>
+                   <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
+                 </transformers>
                </configuration>
              </execution>
            </executions>
@@ -300,6 +303,9 @@
                       </excludes>
                     </filter>
                   </filters>
+                  <transformers>
+                    <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
+                  </transformers>
                 </configuration>
               </execution>
             </executions>
@@ -307,14 +313,14 @@
         </plugins>
       </build>
     </profile>
-    <!-- Include the Apache Apex runner with -P apex-runner -->
+
     <profile>
       <id>apex-runner</id>
       <dependencies>
         <dependency>
           <groupId>org.apache.beam</groupId>
           <artifactId>beam-runners-apex</artifactId>
-	  <version>${beam.version}</version>
+          <version>${beam.version}</version>
           <scope>runtime</scope>
         </dependency>
         <!--
