@@ -1,7 +1,5 @@
 # Apache Beam Portability Demo
 
-TODO: work-in-progress.
-
 For all runners, batch demo shows:
 * Graph structure 
 * Proof of parallelism
@@ -34,6 +32,8 @@ Leaderboard (requires the injector):
     mvn clean compile exec:java@LeaderBoard-Dataflow -Pdataflow-runner
 
 ## Apache Flink cluster in Google Cloud Dataproc
+
+    gsutil cp dataproc-config/dataproc-flink-init.sh gs://apache-beam-demo/config/
 
     gcloud dataproc clusters create gaming-flink \
         --zone=us-central1-f \
