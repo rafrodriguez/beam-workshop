@@ -35,7 +35,14 @@ Leaderboard (requires the injector):
 
 ## Apache Flink cluster in Google Cloud Dataproc
 
-    gcloud dataproc clusters create gaming-flink --zone=us-central1-f --initialization-actions gs://apache-beam-demo/config/dataproc-flink-init.sh --initialization-action-timeout 5m --num-workers=20 --scopes=https://www.googleapis.com/auth/cloud-platform  --worker-boot-disk-size=100gb --master-boot-disk-size=100gb
+    gcloud dataproc clusters create gaming-flink \
+        --zone=us-central1-f \
+        --initialization-actions gs://apache-beam-demo/config/dataproc-flink-init.sh \
+        --initialization-action-timeout 5m \
+        --num-workers=20 \
+        --scopes=https://www.googleapis.com/auth/cloud-platform \
+        --worker-boot-disk-size=100gb \
+        --master-boot-disk-size=100gb
 
 To view the Apache Flink UI, in another terminal:
 
@@ -63,12 +70,27 @@ On the Flink master VM:
     yarn application -list
     gsutil cp gs://apache-beam-demo-davor/staging/portability-demo-bundled-flink.jar .
 
-    /usr/lib/flink/bin/flink run -yid application_1490674683453_0001 -c demo.HourlyTeamScore portability-demo-bundled-flink.jar --runner=flink --outputPrefix=gs://apache-beam-demo-davor/flink/hourly/scores  --input=gs://apache-beam-demo/data/gaming*
-    /usr/lib/flink/bin/flink cancel -yid application_1488916342230_0001
+    /usr/lib/flink/bin/flink run \
+        -yid application_1490674683453_0001 \
+        -c demo.HourlyTeamScore
+        portability-demo-bundled-flink.jar \
+        --runner=flink \
+        --outputPrefix=gs://apache-beam-demo-davor/flink/hourly/scores \
+        --input=gs://apache-beam-demo/data/gaming*
+    
+    /usr/lib/flink/bin/flink cancel \
+        -yid application_1488916342230_0001
 
 ## Apache Spark cluster in Google Cloud Dataproc
 
-    gcloud dataproc clusters create gaming-spark --image-version=1.0 --zone=us-central1-f --num-workers=25 --worker-machine-type=n1-standard-8 --master-machine-type=n1-standard-8 --worker-boot-disk-size=100gb --master-boot-disk-size=100gb
+    gcloud dataproc clusters create gaming-spark \
+        --image-version=1.0 \
+        --zone=us-central1-f \
+        --num-workers=25 \
+        --worker-machine-type=n1-standard-8 \
+        --master-machine-type=n1-standard-8 \
+        --worker-boot-disk-size=100gb \
+        --master-boot-disk-size=100gb
 
 To view the Apache Spark UI, in another terminal:
 
@@ -89,4 +111,12 @@ Submit the job to the cluster:
 
     mvn clean package -Pspark-runner
 
-    gcloud dataproc jobs submit spark --cluster gaming-spark --properties spark.default.parallelism=200 --class demo.HourlyTeamScore --jars ./target/portability-demo-bundled-spark.jar -- --runner=spark --outputPrefix=gs://apache-beam-demo-davor/spark/hourly/scores --input=gs://apache-beam-demo/data/gaming*
+    gcloud dataproc jobs submit spark \
+        --cluster gaming-spark \
+        --properties spark.default.parallelism=200 \
+        --class demo.HourlyTeamScore \
+        --jars ./target/portability-demo-bundled-spark.jar \
+        -- \
+        --runner=spark \
+        --outputPrefix=gs://apache-beam-demo-davor/spark/hourly/scores \
+        --input=gs://apache-beam-demo/data/gaming*
