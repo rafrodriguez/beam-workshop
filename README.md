@@ -63,12 +63,14 @@ Open the UI:
 In the Flink UI, capture values of `jobmanager.rpc.address` and
 `jobmanager.rpc.port` in the Job Manager configuration.
 
-In another terminal, set up an SSH tunnel to the machine in the cluster running
-the Flink Job Manager:
+In separate terminals, set up two SSH tunnels to the machine in the cluster
+running the Flink Job Manager:
 
     gcloud compute ssh gaming-flink-w-6 --zone us-central1-f --ssh-flag="-D 1082"
 
-Build the package and stage it in Google Cloud Storage:
+    gcloud compute ssh gaming-flink-w-6 --zone us-central1-f --ssh-flag="-L 52871:localhost:52871"
+
+Submit the job to the cluster:
 
     mvn clean package exec:java -Pflink-runner \
         -DsocksProxyHost=localhost \
@@ -79,6 +81,11 @@ Build the package and stage it in Google Cloud Storage:
                      --outputPrefix=gs://apache-beam-demo-davor/flink/hourly/scores \
                      --filesToStage=target/portability-demo-bundled-flink.jar \
                      --flinkMaster=gaming-flink-w-6.c.apache-beam-demo.internal:52871"
+
+If you receive an error saying `Cannot resolve the JobManager hostname`, you
+may need to modify your `/etc/hosts` file to include an entry like this:
+
+    127.0.0.1 gaming-flink-w-5.c.apache-beam-demo.internal
 
 ## Apache Spark cluster in Google Cloud Dataproc
 
