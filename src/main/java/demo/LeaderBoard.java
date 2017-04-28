@@ -16,18 +16,22 @@
 package demo;
 
 import org.apache.beam.sdk.Pipeline;
+import org.apache.beam.sdk.coders.NullableCoder;
 import org.apache.beam.sdk.coders.StringUtf8Coder;
-import org.apache.beam.sdk.io.PubsubIO;
+import org.apache.beam.sdk.io.kafka.KafkaIO;
+import org.apache.beam.sdk.io.kafka.KafkaRecord;
 import org.apache.beam.sdk.options.Default;
 import org.apache.beam.sdk.options.Description;
 import org.apache.beam.sdk.options.PipelineOptionsFactory;
 import org.apache.beam.sdk.options.StreamingOptions;
+import org.apache.beam.sdk.transforms.DoFn;
 import org.apache.beam.sdk.transforms.ParDo;
 import org.apache.beam.sdk.transforms.windowing.AfterPane;
 import org.apache.beam.sdk.transforms.windowing.AfterProcessingTime;
 import org.apache.beam.sdk.transforms.windowing.AfterWatermark;
 import org.apache.beam.sdk.transforms.windowing.FixedWindows;
 import org.apache.beam.sdk.transforms.windowing.Window;
+import org.apache.kafka.common.serialization.StringDeserializer;
 import org.joda.time.Duration;
 
 /**
@@ -78,35 +82,50 @@ public class LeaderBoard extends HourlyTeamScore {
 
 
   interface Options extends HourlyTeamScore.Options, StreamingOptions {
-    @Description("Pub/Sub topic to read from")
-    @Default.String("projects/apache-beam-demo/topics/game-fjp")
+    @Description("Topic to read from")
+    @Default.String("game")
     String getTopic();
     void setTopic(String value);
+
+    @Description("Kafka Bootstrap Server")
+    String getKafkaBootstrapServer();
+    void setKafkaBootstrapServer(String value);
+  }
+
+  static class ValuesFn extends DoFn<KafkaRecord<String, String>, String> {
+    @ProcessElement
+    public void processElement(ProcessContext c) {
+      c.output(c.element().getKV().getValue());
+    }
   }
 
   public static void main(String[] args) throws Exception {
 
-    Options options = 
-    		PipelineOptionsFactory.fromArgs(args).withValidation().as(Options.class);
+    Options options =
+        PipelineOptionsFactory.fromArgs(args).withValidation().as(Options.class);
     options.setStreaming(true);
     Pipeline pipeline = Pipeline.create(options);
 
     pipeline
-	    .apply(PubsubIO.<String>read()
-	        .timestampLabel(TIMESTAMP_ATTRIBUTE).topic(options.getTopic())
-	        .withCoder(StringUtf8Coder.of()))
-	    .apply("ParseGameEvent", ParDo.of(new ParseEventFn()))
+    .apply(KafkaIO.<String, String>read()
+        .withBootstrapServers(options.getKafkaBootstrapServer())
+        .withTopic(options.getTopic())
+        .withKeyDeserializer(StringDeserializer.class)
+        .withKeyCoder(NullableCoder.of(StringUtf8Coder.of()))
+        .withValueDeserializer(StringDeserializer.class))
+    .apply("Values", ParDo.of(new ValuesFn()))  //TODO(fjp): Clean this up
+    .apply("ParseGameEvent", ParDo.of(new ParseEventFn()))
 
-      	.apply("FixedWindows", Window.<GameActionInfo>into(FixedWindows.of(FIVE_MINUTES))
-	            .triggering(AfterWatermark.pastEndOfWindow()
-	        		.withEarlyFirings(AfterProcessingTime.pastFirstElementInPane()
-	        				.plusDelayOf(TWO_MINUTES))
-	                .withLateFirings(AfterPane.elementCountAtLeast(1)))
-	        .withAllowedLateness(TEN_MINUTES)
-	        .accumulatingFiredPanes())
-   		  
-         .apply("ExtractTeamScore", new CalculateTeamScores(options.getOutputPrefix()));
-    
+    .apply("FixedWindows", Window.<GameActionInfo>into(FixedWindows.of(FIVE_MINUTES))
+        .triggering(AfterWatermark.pastEndOfWindow()
+            .withEarlyFirings(AfterProcessingTime.pastFirstElementInPane()
+                .plusDelayOf(TWO_MINUTES))
+            .withLateFirings(AfterPane.elementCountAtLeast(1)))
+        .withAllowedLateness(TEN_MINUTES)
+        .accumulatingFiredPanes())
+
+    .apply("ExtractTeamScore", new CalculateTeamScores(options.getOutputPrefix()));
+
     pipeline.run();
   }
 }

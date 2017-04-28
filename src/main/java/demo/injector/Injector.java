@@ -19,6 +19,7 @@ import com.google.api.services.pubsub.Pubsub;
 import com.google.api.services.pubsub.model.PublishRequest;
 import com.google.api.services.pubsub.model.PubsubMessage;
 import com.google.common.collect.ImmutableMap;
+
 import java.io.BufferedOutputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -27,8 +28,16 @@ import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Properties;
 import java.util.Random;
 import java.util.TimeZone;
+
+import org.apache.beam.sdk.options.Description;
+import org.apache.beam.sdk.options.PipelineOptions;
+import org.apache.beam.sdk.options.PipelineOptionsFactory;
+import org.apache.kafka.clients.producer.KafkaProducer;
+import org.apache.kafka.clients.producer.Producer;
+import org.apache.kafka.clients.producer.ProducerRecord;
 import org.joda.time.DateTimeZone;
 import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;
@@ -48,9 +57,7 @@ import org.joda.time.format.DateTimeFormatter;
  * e.g.:
  * user2_AsparagusPig,AsparagusPig,10,1445230923951,2015-11-02 09:09:28.224
  *
- * <p>The Injector writes either to a PubSub topic, or a file. It will use the PubSub topic if
- * specified. It takes the following arguments:
- * {@code Injector project-name (topic-name|none) (filename|none)}.
+ * <p>The Injector writes Kafka, Pubsub and files.
  *
  * <p>To run the Injector in the mode where it publishes to PubSub, you will need to authenticate
  * locally using project-based service account credentials to avoid running over PubSub
@@ -64,25 +71,23 @@ import org.joda.time.format.DateTimeFormatter;
  * 'user account' credentials before you will start to see quota error messages like:
  * "Request throttled due to user QPS limit being reached", and see this exception:
  * ".com.google.api.client.googleapis.json.GoogleJsonResponseException: 429 Too Many Requests".
- * Once you've set up your credentials, run the Injector like this":
-  * <pre>{@code
- * Injector <project-name> <topic-name> none
- * }
- * </pre>
- * The pubsub topic will be created if it does not exist.
  *
- * <p>To run the injector in write-to-file-mode, set the topic name to "none" and specify the
- * filename:
- * <pre>{@code
- * Injector <project-name> none <filename>
- * }
+ * To write to Kafka, specify:
+ *   --kafkaBootstrapServer and --kafkaTopic
+ *
+ * To write to Pubsub, specify:
+ *   --gcpProject and --pubsubTopic
+ *
+ * To write to a file, specify:
+ *   --fileName
  * </pre>
  */
 class Injector {
   private static Pubsub pubsub;
+  private static Properties kafkaProps;
   private static Random random = new Random();
   private static String topic;
-  private static String project;
+  private static Options options;
   private static final String TIMESTAMP_ATTRIBUTE = "timestamp_ms";
 
   // QPS ranges from 800 to 1000.
@@ -94,23 +99,23 @@ class Injector {
   // Lists used to generate random team names.
   private static final ArrayList<String> COLORS =
       new ArrayList<String>(Arrays.asList(
-         "Magenta", "AliceBlue", "Almond", "Amaranth", "Amber",
-         "Amethyst", "AndroidGreen", "AntiqueBrass", "Fuchsia", "Ruby", "AppleGreen",
-         "Apricot", "Aqua", "ArmyGreen", "Asparagus", "Auburn", "Azure", "Banana",
-         "Beige", "Bisque", "BarnRed", "BattleshipGrey"));
+          "Magenta", "AliceBlue", "Almond", "Amaranth", "Amber",
+          "Amethyst", "AndroidGreen", "AntiqueBrass", "Fuchsia", "Ruby", "AppleGreen",
+          "Apricot", "Aqua", "ArmyGreen", "Asparagus", "Auburn", "Azure", "Banana",
+          "Beige", "Bisque", "BarnRed", "BattleshipGrey"));
 
   private static final ArrayList<String> ANIMALS =
       new ArrayList<String>(Arrays.asList(
-         "Echidna", "Koala", "Wombat", "Marmot", "Quokka", "Kangaroo", "Dingo", "Numbat", "Emu",
-         "Wallaby", "CaneToad", "Bilby", "Possum", "Cassowary", "Kookaburra", "Platypus",
-         "Bandicoot", "Cockatoo", "Antechinus"));
+          "Echidna", "Koala", "Wombat", "Marmot", "Quokka", "Kangaroo", "Dingo", "Numbat", "Emu",
+          "Wallaby", "CaneToad", "Bilby", "Possum", "Cassowary", "Kookaburra", "Platypus",
+          "Bandicoot", "Cockatoo", "Antechinus"));
 
   // The list of live teams.
   private static ArrayList<TeamInfo> liveTeams = new ArrayList<TeamInfo>();
 
   private static DateTimeFormatter fmt =
-    DateTimeFormat.forPattern("yyyy-MM-dd HH:mm:ss.SSS")
-        .withZone(DateTimeZone.forTimeZone(TimeZone.getTimeZone("PST")));
+      DateTimeFormat.forPattern("yyyy-MM-dd HH:mm:ss.SSS")
+      .withZone(DateTimeZone.forTimeZone(TimeZone.getTimeZone("PST")));
 
 
   // The total number of robots in the system.
@@ -128,6 +133,28 @@ class Injector {
   // The minimum time a 'team' can live.
   private static final int BASE_TEAM_EXPIRATION_TIME_IN_MINS = 20;
   private static final int TEAM_EXPIRATION_TIME_IN_MINS = 20;
+
+  interface Options extends PipelineOptions {
+    @Description("Kafka Bootstrap Server")
+    String getKafkaBootstrapServer();
+    void setKafkaBootstrapServer(String value);
+
+    @Description("Kafka Topic")
+    String getKafkaTopic();
+    void setKafkaTopic(String value);
+
+    @Description("GCP Project")
+    String getGcpProject();
+    void setGcpProject(String value);
+
+    @Description("Pubsub topic")
+    String getPubsubTopic();
+    void setPubsubTopic(String value);
+
+    @Description("File name")
+    String getFileName();
+    void setFileName(String value);
+  }
 
 
   /**
@@ -147,7 +174,7 @@ class Injector {
       this.startTimeInMillis = startTimeInMillis;
       // How long until this team is dissolved.
       this.expirationPeriod = random.nextInt(TEAM_EXPIRATION_TIME_IN_MINS)
-        + BASE_TEAM_EXPIRATION_TIME_IN_MINS;
+          + BASE_TEAM_EXPIRATION_TIME_IN_MINS;
       this.robot = robot;
       // Determine the number of team members.
       numMembers = random.nextInt(MEMBERS_PER_TEAM) + BASE_MEMBERS_PER_TEAM;
@@ -178,7 +205,7 @@ class Injector {
     @Override
     public String toString() {
       return "(" + teamName + ", num members: " + numMembers() + ", starting at: "
-        + startTimeInMillis + ", expires in: " + expirationPeriod + ", robot: " + robot + ")";
+          + startTimeInMillis + ", expires in: " + expirationPeriod + ", robot: " + robot + ")";
     }
   }
 
@@ -200,8 +227,8 @@ class Injector {
     if ((team.getEndTimeInMillis() < currTime) || team.numMembers() == 0) {
       System.out.println("\nteam " + team + " is too old; replacing.");
       System.out.println("start time: " + team.getStartTimeInMillis()
-        + ", end time: " + team.getEndTimeInMillis()
-        + ", current time:" + currTime);
+      + ", end time: " + team.getEndTimeInMillis()
+      + ", current time:" + currTime);
       removeTeam(index);
       // Add a new team in its stead.
       return (addLiveTeam());
@@ -282,7 +309,7 @@ class Injector {
    * Publish 'numMessages' arbitrary events from live users with the provided delay, to a
    * PubSub topic.
    */
-  public static void publishData(int numMessages, int delayInMillis)
+  public static void publishDataToPubSub(int numMessages, int delayInMillis)
       throws IOException {
     List<PubsubMessage> pubsubMessages = new ArrayList<>();
 
@@ -290,7 +317,7 @@ class Injector {
       Long currTime = System.currentTimeMillis();
       String message = generateEvent(currTime, delayInMillis);
       PubsubMessage pubsubMessage = new PubsubMessage()
-              .encodeData(message.getBytes("UTF-8"));
+          .encodeData(message.getBytes("UTF-8"));
       pubsubMessage.setAttributes(
           ImmutableMap.of(TIMESTAMP_ATTRIBUTE,
               Long.toString((currTime - delayInMillis) / 1000 * 1000)));
@@ -304,6 +331,30 @@ class Injector {
     PublishRequest publishRequest = new PublishRequest();
     publishRequest.setMessages(pubsubMessages);
     pubsub.projects().topics().publish(topic, publishRequest).execute();
+  }
+
+  /**
+   * Publish 'numMessages' arbitrary events from live users with the provided delay, to a
+   * Kafka topic.
+   */
+  public static void publishDataToKafka(int numMessages, int delayInMillis)
+      throws IOException {
+
+    Producer<String, String> producer = new KafkaProducer<>(kafkaProps);
+
+    for (int i = 0; i < Math.max(1, numMessages); i++) {
+      Long currTime = System.currentTimeMillis();
+      String message = generateEvent(currTime, delayInMillis);
+      producer.send(new ProducerRecord<String, String>("game", null, message)); //TODO(fjp): Generalize
+      // TODO(fjp): How do we get late data working?
+      // if (delayInMillis != 0) {
+      //   System.out.println(pubsubMessage.getAttributes());
+      //   System.out.println("late data for: " + message);
+      // }
+      // pubsubMessages.add(pubsubMessage);
+    }
+
+    producer.close();
   }
 
   /**
@@ -332,35 +383,48 @@ class Injector {
 
 
   public static void main(String[] args) throws IOException, InterruptedException {
-    if (args.length < 3) {
-      System.out.println("Usage: Injector project-name (topic-name|none) (filename|none)");
-      System.exit(1);
-    }
-    boolean writeToFile = false;
+    options = PipelineOptionsFactory.fromArgs(args).withValidation().as(Options.class);
+
+    boolean writeToFile = true;
     boolean writeToPubsub = true;
-    project = args[0];
-    String topicName = args[1];
-    String fileName = args[2];
-    // The Injector writes either to a PubSub topic, or a file. It will use the PubSub topic if
-    // specified; otherwise, it will try to write to a file.
-    if (topicName.equalsIgnoreCase("none")) {
-      writeToFile = true;
+    boolean writeToKafka = true;
+
+    if (options.getGcpProject() == null || options.getPubsubTopic() == null) {
       writeToPubsub = false;
-    }
-    if (writeToPubsub) {
+      System.out.println("Not writing to pubsub. Missing values for --gcpProject and/or --pubsubTopic");
+    } else {
       // Create the PubSub client.
       pubsub = InjectorUtils.getClient();
       // Create the PubSub topic as necessary.
-      topic = InjectorUtils.getFullyQualifiedTopicName(project, topicName);
+      topic = InjectorUtils.getFullyQualifiedTopicName(options.getGcpProject(), options.getPubsubTopic());
       InjectorUtils.createTopic(pubsub, topic);
-      System.out.println("Injecting to topic: " + topic);
-    } else {
-      if (fileName.equalsIgnoreCase("none")) {
-        System.out.println("Filename not specified.");
-        System.exit(1);
-      }
-      System.out.println("Writing to file: " + fileName);
+      System.out.println("Writing to pubusb topic: " + topic);
     }
+
+    if (options.getKafkaBootstrapServer() == null || options.getKafkaTopic() == null) {
+      writeToKafka = false;
+      System.out.println("Not writing to kafka. Missing values for --kafkaBootstrapServer and/or --kafkaTopic");
+    } else {
+      kafkaProps = new Properties();
+      kafkaProps.put("bootstrap.servers", options.getKafkaBootstrapServer());
+      kafkaProps.put("acks", "all");
+      kafkaProps.put("retries", 0);
+      kafkaProps.put("batch.size", 16384);
+      kafkaProps.put("linger.ms", 1);
+      kafkaProps.put("buffer.memory", 33554432);
+      kafkaProps.put("key.serializer", "org.apache.kafka.common.serialization.StringSerializer");
+      kafkaProps.put("value.serializer", "org.apache.kafka.common.serialization.StringSerializer");
+
+      System.out.println("Writing to kafka topic: " + options.getKafkaTopic());
+    }
+
+    if (options.getFileName() == null) {
+      writeToFile = false;
+      System.out.println("Not writing to file. Missing value for --fileName");
+    } else {
+      System.out.println("Writing to file: " + options.getFileName());
+    }
+
     System.out.println("Starting Injector");
 
     // Start off with some random live teams.
@@ -389,14 +453,28 @@ class Injector {
       }
 
       if (writeToFile) { // Won't use threading for the file write.
-        publishDataToFile(fileName, numMessages, delayInMillis);
-      } else { // Write to PubSub.
+        publishDataToFile(options.getFileName(), numMessages, delayInMillis);
+      }
+      if (writeToPubsub) { // Write to PubSub.
         // Start a thread to inject some data.
         new Thread(){
           @Override
           public void run() {
             try {
-              publishData(numMessages, delayInMillis);
+              publishDataToPubSub(numMessages, delayInMillis);
+            } catch (IOException e) {
+              System.err.println(e);
+            }
+          }
+        }.start();
+      }
+      if (writeToKafka) { // Write to Kafka.
+        // Start a thread to inject some data.
+        new Thread(){
+          @Override
+          public void run() {
+            try {
+              publishDataToKafka(numMessages, delayInMillis);
             } catch (IOException e) {
               System.err.println(e);
             }

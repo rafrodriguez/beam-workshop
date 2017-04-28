@@ -26,11 +26,11 @@
   <packaging>jar</packaging>
 
   <properties>
-    <beam.version>0.6.0</beam.version>
+    <beam.version>0.7.0-SNAPSHOT</beam.version>
     <hadoop.version>2.7.2</hadoop.version>
-
+    <kafka-topic>game</kafka-topic>
+    <kafka-server>35.184.123.25:9092</kafka-server> <!-- TODO(fjp): Make parameterizable. -->
     <gcp.project-name>apache-beam-demo</gcp.project-name>
-    <gcp.pubsub-topic>game-fjp</gcp.pubsub-topic>
     <gcp.hourlyteamscore-input>gs://apache-beam-demo/data/gaming*</gcp.hourlyteamscore-input>
     <gcp.hourlyteamscore-output>gs://apache-beam-demo-davor/dataflow/hourly/scores</gcp.hourlyteamscore-output>
     <gcp.leaderboard-output>gs://apache-beam-demo-davor/dataflow/leader/scores</gcp.leaderboard-output>
@@ -132,9 +132,8 @@
               <configuration>
                 <mainClass>demo.injector.Injector</mainClass>
                 <arguments>
-                  <argument>${gcp.project-name}</argument>
-                  <argument>${gcp.pubsub-topic}</argument>
-                  <argument>none</argument>
+                  <argument>--kafkaBootstrapServer=${kafka-server}</argument>
+                  <argument>--kafkaTopic=${kafka-topic}</argument>
                 </arguments>
               </configuration>
             </execution>
@@ -151,6 +150,7 @@
                   <argument>--project=${gcp.project-name}</argument>
                   <argument>--input=${gcp.hourlyteamscore-input}</argument>
                   <argument>--outputPrefix=${gcp.hourlyteamscore-output}</argument>
+                  <argument>--gcpTempLocation=gs://dataflow-staging-us-central1-857645072068/staging</argument>
                 </arguments>
               </configuration>
             </execution>
@@ -165,7 +165,10 @@
                 <arguments>
                   <argument>--runner=dataflow</argument>
                   <argument>--project=${gcp.project-name}</argument>
+                  <argument>--kafkaBootstrapServer=${kafka-server}</argument>
+                  <argument>--topic=${kafka-topic}</argument>
                   <argument>--outputPrefix=${gcp.leaderboard-output}</argument>
+                  <argument>--gcpTempLocation=gs://dataflow-staging-us-central1-857645072068/staging</argument>
                 </arguments>
               </configuration>
             </execution>
@@ -426,6 +429,24 @@
       <groupId>org.apache.beam</groupId>
       <artifactId>beam-sdks-java-core</artifactId>
       <version>${beam.version}</version>
+    </dependency>
+
+    <dependency>
+      <groupId>org.apache.beam</groupId>
+      <artifactId>beam-sdks-java-io-kafka</artifactId>
+      <version>${beam.version}</version>
+    </dependency>
+
+    <dependency>
+		<groupId>org.apache.beam</groupId>
+		<artifactId>beam-sdks-java-io-google-cloud-platform</artifactId>
+		<version>${beam.version}</version>
+    </dependency>
+
+    <dependency>
+		<groupId>org.apache.kafka</groupId>
+		<artifactId>kafka-clients</artifactId>
+		<version>0.10.2.0</version>
     </dependency>
 
     <dependency>

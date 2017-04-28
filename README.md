@@ -21,6 +21,23 @@ On a new "injector VM", install Maven (minimum 3.3.1), git, and OpenJDK 7.
 
 Press `Ctrl-A`, `Ctrl-D` (later `screen -r` to resume).
 
+## Apache Kafka cluster in Google Cloud Dataproc
+
+    gsutil cp dataproc-config/dataproc-kafka-init.sh gs://apache-beam-demo/config/
+
+    gcloud dataproc clusters create kafka \
+        --zone=us-central1-f \
+        --initialization-actions gs://apache-beam-demo/config/dataproc-kafka-init.sh \
+        --initialization-action-timeout 5m \
+        --num-workers=2 \
+        --scopes=https://www.googleapis.com/auth/cloud-platform \
+        --worker-boot-disk-size=100gb \
+        --master-boot-disk-size=500gb \
+        --master-machine-type n1-standard-4 \
+        --worker-machine-type n1-standard-4
+
+    bin/kafka-topics.sh --create --zookeeper <external ip for kafka-m>:2181 --replication-factor 1 --partitions 1 --topic game
+
 ## Google Cloud Dataflow
 
 HourlyTeamScore:
