@@ -26,13 +26,18 @@ import org.apache.beam.sdk.options.PipelineOptionsFactory;
 import org.apache.beam.sdk.options.StreamingOptions;
 import org.apache.beam.sdk.transforms.DoFn;
 import org.apache.beam.sdk.transforms.ParDo;
+import org.apache.beam.sdk.transforms.SerializableFunction;
 import org.apache.beam.sdk.transforms.windowing.AfterPane;
 import org.apache.beam.sdk.transforms.windowing.AfterProcessingTime;
 import org.apache.beam.sdk.transforms.windowing.AfterWatermark;
 import org.apache.beam.sdk.transforms.windowing.FixedWindows;
 import org.apache.beam.sdk.transforms.windowing.Window;
+import org.apache.beam.sdk.values.KV;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.joda.time.Duration;
+import org.joda.time.Instant;
+
+import demo.HourlyTeamScore.GameActionInfo;
 
 /**
  * This class is the third in a series of four pipelines that tell a story in a 'gaming' domain,
@@ -92,6 +97,19 @@ public class LeaderBoard extends HourlyTeamScore {
     void setKafkaBootstrapServer(String value);
   }
 
+  private static class SetTimestampFn
+  implements SerializableFunction<KV<String, String>, Instant> {
+    @Override
+    public Instant apply(KV<String, String> input) {
+      String[] components = input.getValue().split(",");
+      try {
+        return new Instant(Long.parseLong(components[3].trim()));
+      } catch (ArrayIndexOutOfBoundsException | NumberFormatException e) {
+        return Instant.now();
+      }
+    }
+  }
+
   static class ValuesFn extends DoFn<KafkaRecord<String, String>, String> {
     @ProcessElement
     public void processElement(ProcessContext c) {
@@ -103,7 +121,6 @@ public class LeaderBoard extends HourlyTeamScore {
 
     Options options =
         PipelineOptionsFactory.fromArgs(args).withValidation().as(Options.class);
-    options.setStreaming(true);
     Pipeline pipeline = Pipeline.create(options);
 
     pipeline
@@ -111,12 +128,11 @@ public class LeaderBoard extends HourlyTeamScore {
         .withBootstrapServers(options.getKafkaBootstrapServer())
         .withTopic(options.getTopic())
         .withKeyDeserializer(StringDeserializer.class)
-        .withKeyCoder(NullableCoder.of(StringUtf8Coder.of()))
-        .withValueDeserializer(StringDeserializer.class))
-    .apply("Values", ParDo.of(new ValuesFn()))  //TODO(fjp): Clean this up
-    .apply("ParseGameEvent", ParDo.of(new ParseEventFn()))
+        .withValueDeserializer(StringDeserializer.class)
+        .withTimestampFn(new SetTimestampFn()))
+    .apply("Values", ParDo.of(new ValuesFn()))
 
-    .apply("FixedWindows", Window.<GameActionInfo>into(FixedWindows.of(FIVE_MINUTES))
+    .apply("FixedWindows", Window.<String>into(FixedWindows.of(FIVE_MINUTES))
         .triggering(AfterWatermark.pastEndOfWindow()
             .withEarlyFirings(AfterProcessingTime.pastFirstElementInPane()
                 .plusDelayOf(TWO_MINUTES))

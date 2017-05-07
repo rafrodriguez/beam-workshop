@@ -9,6 +9,34 @@ For all runners, batch demo shows:
 Streaming demo adds:
 * Watermarks
 
+
+## Apache Kafka cluster in Google Cloud Dataproc
+
+Set firewall rules for your GCP project to open `tcp:2181, tcp:2888, tcp:3888` for Zookeeper and `tcp:9092` for Kafka.
+	
+Upload the Dataproc config script that will install Kafka on Dataproc:
+
+    gsutil cp dataproc-config/dataproc-kafka-init.sh gs://apache-beam-demo/config/
+
+Start the Kafka cluster:
+
+    gcloud dataproc clusters create kafka \
+        --zone=us-central1-f \
+        --initialization-actions gs://apache-beam-demo/config/dataproc-kafka-init.sh \
+        --initialization-action-timeout 5m \
+        --num-workers=3 \
+        --scopes=https://www.googleapis.com/auth/cloud-platform \
+        --worker-boot-disk-size=100gb \
+        --master-boot-disk-size=500gb \
+        --master-machine-type n1-standard-4 \
+        --worker-machine-type n1-standard-4       
+
+Create a topic to use for the game:
+
+    bin/kafka-topics.sh --create --zookeeper <external ip for kafka-m>:2181 --replication-factor 1 --partitions 3 --topic game
+
+Note: The project `pom.xml` currently hard codes the external IP address for `kafka-m`, so you'll need to edit it by hand.
+
 ## Injector
 
 On a new "injector VM", install Maven (minimum 3.3.1), git, and OpenJDK 7.
@@ -20,23 +48,6 @@ On a new "injector VM", install Maven (minimum 3.3.1), git, and OpenJDK 7.
     mvn clean compile exec:java@injector
 
 Press `Ctrl-A`, `Ctrl-D` (later `screen -r` to resume).
-
-## Apache Kafka cluster in Google Cloud Dataproc
-
-    gsutil cp dataproc-config/dataproc-kafka-init.sh gs://apache-beam-demo/config/
-
-    gcloud dataproc clusters create kafka \
-        --zone=us-central1-f \
-        --initialization-actions gs://apache-beam-demo/config/dataproc-kafka-init.sh \
-        --initialization-action-timeout 5m \
-        --num-workers=2 \
-        --scopes=https://www.googleapis.com/auth/cloud-platform \
-        --worker-boot-disk-size=100gb \
-        --master-boot-disk-size=500gb \
-        --master-machine-type n1-standard-4 \
-        --worker-machine-type n1-standard-4
-
-    bin/kafka-topics.sh --create --zookeeper <external ip for kafka-m>:2181 --replication-factor 1 --partitions 1 --topic game
 
 ## Google Cloud Dataflow
 
@@ -77,17 +88,17 @@ Open the UI:
 
     http://gaming-flink-m:8088/
 
-In the Flink UI, capture values of `jobmanager.rpc.address` and
-`jobmanager.rpc.port` in the Job Manager configuration.
+In the Flink UI, capture values of `jobmanager.rpc.address` (i.e. gaming-flink-w-5) and
+`jobmanager.rpc.port` (i.e. 58268) in the Job Manager configuration.
 
-In separate terminals, set up two SSH tunnels to the machine in the cluster
+In separate terminals, use those two values to set up two SSH tunnels to the machine in the cluster
 running the Flink Job Manager:
 
-    gcloud compute ssh gaming-flink-w-6 --zone us-central1-f --ssh-flag="-D 1082"
+    gcloud compute ssh gaming-flink-w-10 --zone us-central1-f --ssh-flag="-D 1082"
 
-    gcloud compute ssh gaming-flink-w-6 --zone us-central1-f --ssh-flag="-L 52871:localhost:52871"
+    gcloud compute ssh gaming-flink-w-10 --zone us-central1-f --ssh-flag="-L 40007:localhost:40007"
 
-Submit the job to the cluster:
+Submit HourlyTeamScore to the cluster:
 
     mvn clean package exec:java -Pflink-runner \
         -DsocksProxyHost=localhost \
@@ -95,9 +106,22 @@ Submit the job to the cluster:
         -Dexec.mainClass="demo.HourlyTeamScore" \
         -Dexec.args="--runner=flink \
                      --input=gs://apache-beam-demo/data/gaming* \
-                     --outputPrefix=gs://apache-beam-demo-davor/flink/hourly/scores \
+                     --outputPrefix=gs://apache-beam-demo-fjp/flink/hourly/scores \
                      --filesToStage=target/portability-demo-bundled-flink.jar \
-                     --flinkMaster=gaming-flink-w-6.c.apache-beam-demo.internal:52871"
+                     --flinkMaster=gaming-flink-w-10.c.apache-beam-demo.internal:40007"
+                     
+Submit LeaderBoard to the cluster:
+
+    mvn clean package exec:java -Pflink-runner \
+        -DsocksProxyHost=localhost \
+        -DsocksProxyPort=1082 \
+        -Dexec.mainClass="demo.LeaderBoard" \
+        -Dexec.args="--runner=flink \
+                     --kafkaBootstrapServer=35.184.132.47:9092 \
+                     --topic=game \
+                     --outputPrefix=gs://apache-beam-demo-fjp/flink/leader/scores \
+                     --filesToStage=target/portability-demo-bundled-flink.jar \
+                     --flinkMaster=gaming-flink-w-10.c.apache-beam-demo.internal:40007"                     
 
 If you receive an error saying `Cannot resolve the JobManager hostname`, you
 may need to modify your `/etc/hosts` file to include an entry like this:
@@ -142,5 +166,5 @@ Submit the job to the cluster:
         --jars ./target/portability-demo-bundled-spark.jar \
         -- \
         --runner=spark \
-        --outputPrefix=gs://apache-beam-demo-davor/spark/hourly/scores \
+        --outputPrefix=gs://apache-beam-demo-fjp/spark/hourly/scores \
         --input=gs://apache-beam-demo/data/gaming*
