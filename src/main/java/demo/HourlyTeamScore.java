@@ -203,7 +203,7 @@ public class HourlyTeamScore {
     }
   }
 
-  /** Takes a collection of GameActionInfo events and writes the sums per team to files. */
+  /** Takes a collection of Strings events and writes the sums per team to files. */
   public static class CalculateTeamScores
   extends PTransform<PCollection<String>, PDone> {
 
@@ -217,12 +217,13 @@ public class HourlyTeamScore {
     public PDone expand(PCollection<String> line) {
 
       return line
-          .apply("ParseGameEvent", ParDo.of(new ParseEventFn()))
+          .apply(ParDo.of(new ParseEventFn()))
           .apply(ParDo.of(new KeyScoreByTeamFn()))
           .apply(Sum.<String>integersPerKey())
           .apply(ToString.kvs())
-          .apply(TextIO.write().to(filepath).withWindowedWrites()
-              .withFilenamePolicy(new PerWindowFiles("count")).withNumShards(3));
+          .apply(TextIO.write().to(filepath)
+              .withWindowedWrites().withNumShards(3)
+              .withFilenamePolicy(new PerWindowFiles("count")));
     }
   }
 
@@ -239,7 +240,7 @@ public class HourlyTeamScore {
 
     .apply("FixedWindows", Window.<String>into(FixedWindows.of(ONE_HOUR)))
 
-    .apply("SumTeamScores", new CalculateTeamScores(options.getOutputPrefix()));
+    .apply("TeamScores", new CalculateTeamScores(options.getOutputPrefix()));
 
     pipeline.run();
   }

@@ -140,7 +140,7 @@ public class LeaderBoard extends HourlyTeamScore {
         .withAllowedLateness(TEN_MINUTES)
         .accumulatingFiredPanes())
 
-    .apply("ExtractTeamScore", new CalculateTeamScores(options.getOutputPrefix()));
+    .apply("TeamScore", new CalculateTeamScores(options.getOutputPrefix()));
 
     pipeline.run();
   }
