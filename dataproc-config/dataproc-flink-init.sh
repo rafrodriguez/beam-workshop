@@ -45,9 +45,9 @@ readonly FLINK_TASKMANAGER_MEMORY_FRACTION='1.0'
 readonly START_FLINK_YARN_SESSION="true"
 
 function install_flink() {
-  readonly local url='http://www-us.apache.org/dist/flink/flink-1.2.0/flink-1.2.0-bin-hadoop27-scala_2.10.tgz'
-  readonly local tarball='flink-1.2.0-bin-hadoop27-scala_2.10.tgz'
-  readonly local extract_dir='flink-1.2.0'
+  readonly local url='http://www-us.apache.org/dist/flink/flink-1.3.1/flink-1.3.1-bin-hadoop27-scala_2.10.tgz'
+  readonly local tarball='flink-1.3.1-bin-hadoop27-scala_2.10.tgz'
+  readonly local extract_dir='flink-1.3.1'
   mkdir -p "${FLINK_INSTALL_DIR}"
   pushd "${FLINK_INSTALL_DIR}"
   wget "${url}"
