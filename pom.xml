@@ -26,10 +26,10 @@
   <packaging>jar</packaging>
 
   <properties>
-    <beam.version>0.7.0-SNAPSHOT</beam.version>
+    <beam.version>2.0.0</beam.version>
     <hadoop.version>2.7.2</hadoop.version>
     <kafka-topic>game</kafka-topic>
-    <kafka-server>35.184.132.47:9092</kafka-server> <!-- TODO(fjp): Make parameterizable. -->
+    <kafka-server>104.154.34.238:9092</kafka-server> <!-- TODO(fjp): Make parameterizable. -->
     <gcp.project-name>apache-beam-demo</gcp.project-name>
     <gcp.hourlyteamscore-input>gs://apache-beam-demo/data/gaming*</gcp.hourlyteamscore-input>
     <gcp.hourlyteamscore-output>gs://apache-beam-demo-fjp/dataflow/hourly/scores</gcp.hourlyteamscore-output>
