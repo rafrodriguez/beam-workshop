@@ -43,6 +43,7 @@ On a new "injector VM", install Maven (minimum 3.3.1), git, and OpenJDK 7.
 
     git clone https://github.com/davorbonaci/beam-portability-demo.git
     cd beam-portability-demo
+Edit the pom to use the address of kafka-m.
 
     screen
     mvn clean compile exec:java@injector
