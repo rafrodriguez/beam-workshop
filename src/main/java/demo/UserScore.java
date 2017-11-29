@@ -17,13 +17,7 @@
  */
 package demo;
 
-import java.util.HashMap;
-import java.util.Map;
-import org.apache.avro.reflect.Nullable;
-import org.apache.beam.examples.complete.game.utils.WriteToText;
 import org.apache.beam.sdk.Pipeline;
-import org.apache.beam.sdk.coders.AvroCoder;
-import org.apache.beam.sdk.coders.DefaultCoder;
 import org.apache.beam.sdk.io.TextIO;
 import org.apache.beam.sdk.metrics.Counter;
 import org.apache.beam.sdk.metrics.Metrics;
@@ -33,21 +27,17 @@ import org.apache.beam.sdk.options.PipelineOptions;
 import org.apache.beam.sdk.options.PipelineOptionsFactory;
 import org.apache.beam.sdk.options.Validation;
 import org.apache.beam.sdk.transforms.DoFn;
-import org.apache.beam.sdk.transforms.MapElements;
-import org.apache.beam.sdk.transforms.PTransform;
 import org.apache.beam.sdk.transforms.ParDo;
 import org.apache.beam.sdk.transforms.Sum;
+import org.apache.beam.sdk.transforms.ToString;
 import org.apache.beam.sdk.values.KV;
-import org.apache.beam.sdk.values.PCollection;
-import org.apache.beam.sdk.values.TypeDescriptors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * This class is the first in a series of four pipelines that tell a story in a 'gaming' domain.
  * Concepts: batch processing, reading input from text files, writing output to
- * text files, using standalone DoFns, use of the sum per key transform, and use of
- * Java 8 lambda syntax.
+ * text files, using standalone DoFns, and use of the sum per key transform.
  *
  * <p>In this gaming scenario, many users play, as members of different teams, over the course of a
  * day, and their actions are logged for processing.  Some of the logged game events may be late-
@@ -71,47 +61,7 @@ import org.slf4j.LoggerFactory;
  * generate your own batch data.
   */
 public class UserScore {
-
-  /**
-   * Class to hold info about a game event.
-   */
-  @DefaultCoder(AvroCoder.class)
-  static class GameActionInfo {
-    @Nullable String user;
-    @Nullable String team;
-    @Nullable Integer score;
-    @Nullable Long timestamp;
-
-    public GameActionInfo() {}
-
-    public GameActionInfo(String user, String team, Integer score, Long timestamp) {
-      this.user = user;
-      this.team = team;
-      this.score = score;
-      this.timestamp = timestamp;
-    }
-
-    public String getUser() {
-      return this.user;
-    }
-    public String getTeam() {
-      return this.team;
-    }
-    public Integer getScore() {
-      return this.score;
-    }
-    public String getKey(String keyname) {
-      if (keyname.equals("team")) {
-        return this.team;
-      } else {  // return username as default
-        return this.user;
-      }
-    }
-    public Long getTimestamp() {
-      return this.timestamp;
-    }
-  }
-
+  private static final Logger LOG = LoggerFactory.getLogger(UserScore.class);
 
   /**
    * Parses the raw game event info into GameActionInfo objects. Each event line has the following
@@ -147,28 +97,12 @@ public class UserScore {
    * A transform to extract key/score information from GameActionInfo, and sum the scores. The
    * constructor arg determines whether 'team' or 'user' info is extracted.
    */
-  // [START DocInclude_USExtractXform]
-  public static class ExtractAndSumScore
-      extends PTransform<PCollection<GameActionInfo>, PCollection<KV<String, Integer>>> {
-
-    private final String field;
-
-    ExtractAndSumScore(String field) {
-      this.field = field;
-    }
-
-    @Override
-    public PCollection<KV<String, Integer>> expand(
-        PCollection<GameActionInfo> gameInfo) {
-
-      return gameInfo
-        .apply(MapElements
-            .into(TypeDescriptors.kvs(TypeDescriptors.strings(), TypeDescriptors.integers()))
-            .via((GameActionInfo gInfo) -> KV.of(gInfo.getKey(field), gInfo.getScore())))
-        .apply(Sum.<String>integersPerKey());
+  static class KeyScoreByUserFn extends DoFn<GameActionInfo, KV<String, Integer>> {
+    @ProcessElement
+    public void processElement(ProcessContext c) {
+      c.output(KV.of(c.element().getUser(), c.element().getScore()));
     }
   }
-  // [END DocInclude_USExtractXform]
 
 
   /**
@@ -191,38 +125,28 @@ public class UserScore {
   }
 
   /**
-   * Create a map of information that describes how to write pipeline output to text. This map
-   * is passed to the {@link WriteToText} constructor to write user score sums.
-   */
-  protected static Map<String, WriteToText.FieldFn<KV<String, Integer>>>
-      configureOutput() {
-    Map<String, WriteToText.FieldFn<KV<String, Integer>>> config =
-        new HashMap<String, WriteToText.FieldFn<KV<String, Integer>>>();
-    config.put("user", (c, w) -> c.element().getKey());
-    config.put("total_score", (c, w) -> c.element().getValue());
-    return config;
-  }
-
-  /**
    * Run a batch pipeline.
    */
   public static void main(String[] args) throws Exception {
     // Begin constructing a pipeline configured by commandline flags.
     Options options = PipelineOptionsFactory.fromArgs(args).withValidation().as(Options.class);
     Pipeline pipeline = Pipeline.create(options);
+    LOG.info("pipeline options: " + options.toString());
 
     // Read events from a text file and parse them.
     pipeline
         .apply(TextIO.read().from(options.getInput()))
+
+        // Parse the comma-separated values into a GameActionItem instance.
         .apply("ParseGameEvent", ParDo.of(new ParseEventFn()))
-        // Extract and sum username/score pairs from the event data.
-        .apply("ExtractUserScore", new ExtractAndSumScore("user"))
-        .apply(
-            "WriteUserScoreSums",
-            new WriteToText<KV<String, Integer>>(
-                options.getOutput(),
-                configureOutput(),
-                false));
+
+        // Extract username/score pairs from the event data.
+        .apply("ExtractUserScore", ParDo.of(new KeyScoreByUserFn()))
+
+        // Sum the score for every user.
+        .apply(Sum.<String>integersPerKey())
+        .apply(ToString.kvs())
+        .apply(TextIO.write().to(options.getOutput()));
 
     // Run the batch pipeline.
     pipeline.run().waitUntilFinish();

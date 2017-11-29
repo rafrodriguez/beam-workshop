@@ -236,6 +236,7 @@ public class HourlyTeamScore {
 
     pipeline
     .apply("ReadLogs", TextIO.read().from(options.getInput()))
+
     .apply("SetTimestamps", WithTimestamps.of(new SetTimestampFn()))
 
     .apply("FixedWindows", Window.<String>into(FixedWindows.of(ONE_HOUR)))

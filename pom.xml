@@ -28,12 +28,13 @@
   <properties>
     <beam.version>2.1.0</beam.version>
     <hadoop.version>2.7.2</hadoop.version>
+    <pubsub-topic>game</pubsub-topic>
     <kafka-topic>game</kafka-topic>
-    <kafka-server>104.154.34.238:9092</kafka-server> <!-- TODO(fjp): Make parameterizable. -->
+    <kafka-server></kafka-server>   <!-- needs to be passed in -->
     <gcp.project-name>apache-beam-demo</gcp.project-name>
-    <gcp.hourlyteamscore-input>gs://apache-beam-demo/data/gaming*</gcp.hourlyteamscore-input>
-    <gcp.hourlyteamscore-output>gs://apache-beam-demo-fjp/dataflow/hourly/scores</gcp.hourlyteamscore-output>
-    <gcp.leaderboard-output>gs://apache-beam-demo-fjp/dataflow/leader/scores</gcp.leaderboard-output>
+    <gcp.input-file>gs://apache-beam-demo/data/gaming*</gcp.input-file>
+    <gcp.output-bucket>gs://beam-workshop-bucket</gcp.output-bucket>
+    <gcp.leaderboard-output>${gcp.output-bucket}/dataflow/leader/scores</gcp.leaderboard-output>
   </properties>
 
   <repositories>
@@ -78,7 +79,7 @@
               <rules>
                 <requireMavenVersion>
                   <version>3.3.1</version>
-                </requireMavenVersion>                
+                </requireMavenVersion>
               </rules>
               <fail>true</fail>
             </configuration>
@@ -112,6 +113,12 @@
           </execution>
         </executions>
       </plugin>
+
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-help-plugin</artifactId>
+        <version>2.1</version>
+      </plugin>
     </plugins>
 
     <pluginManagement>
@@ -139,6 +146,23 @@
             </execution>
 
             <execution>
+              <id>UserScore-Dataflow</id>
+              <goals>
+                <goal>java</goal>
+              </goals>
+              <configuration>
+                <mainClass>demo.HourlyTeamScore</mainClass>
+                <arguments>
+                  <argument>--runner=dataflow</argument>
+                  <argument>--project=${gcp.project-name}</argument>
+                  <argument>--input=${gcp.input-file}</argument>
+                  <argument>--output=${gcp.output-bucket}/dataflow/user/scores</argument>
+                  <argument>--gcpTempLocation=${gcp.output-bucket}/staging</argument>
+                </arguments>
+              </configuration>
+            </execution>
+
+            <execution>
               <id>HourlyTeamScore-Dataflow</id>
               <goals>
                 <goal>java</goal>
@@ -148,9 +172,9 @@
                 <arguments>
                   <argument>--runner=dataflow</argument>
                   <argument>--project=${gcp.project-name}</argument>
-                  <argument>--input=${gcp.hourlyteamscore-input}</argument>
-                  <argument>--outputPrefix=${gcp.hourlyteamscore-output}</argument>
-                  <argument>--gcpTempLocation=gs://dataflow-staging-us-central1-857645072068/staging</argument>
+                  <argument>--input=${gcp.input-file}</argument>
+                  <argument>--outputPrefix=${gcp.output-bucket}/dataflow/hourly/scores</argument>
+                  <argument>--gcpTempLocation=${gcp.output-bucket}/staging</argument>
                 </arguments>
               </configuration>
             </execution>

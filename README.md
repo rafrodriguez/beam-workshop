@@ -1,4 +1,64 @@
-# Apache Beam Portability Demo
+# Apache Beam Workshop
+This is a full course that should help you immerse yourself in Apache Beam.
+Through this workshop, we will review Batch and Streaming concepts, and apply
+them to build some data analytics pipelines.
+
+For this, you will need the following:
+* A Github account, to clone this repository
+* A setup for some Beam runner:
+  * A Spark Cluster
+  * A Flink Cluster
+  * A GCP Project with Dataflow enabled
+  * The Beam Direct runner
+* It's desirable, but not necessary, to have familiarity with the high-level
+  concepts of distributed data processing.
+
+### Java / Python / Runners
+This workshop is mainly geared for Java, so you can run the exercises in
+different runners. Nonetheless, also Python examples are provided.
+
+## Getting started
+First of all, you'll need to set up the basic environment variables that you
+will use to submit jobs to different clusters, and sources. Run:
+
+    source setup.sh
+
+Normally the default values will be enough, but check with the instructor to make
+sure that you get all the proper variables.
+
+### Requirements
+You will need to have Maven 3.3.1+, and JDK 7+ installed. To install them:
+
+* OpenJDK http://openjdk.java.net/install/
+* Maven [Download: https://maven.apache.org/download.cgi, Install: https://maven.apache.org/install.html]
+* Git   https://git-scm.com/book/en/v2/Getting-Started-Installing-Git
+
+## Running pipeline
+
+
+    mvn clean package exec:java -Pdirect-runner \
+        -Dexec.mainClass="demo.UserScore" \
+        -Dexec.args="--runner=DirectRunner --input=data/demo-file.csv --output=data/outputfiles"
+
+    mvn clean package exec:java -Pdataflow-runner \
+        -Dexec.mainClass="demo.UserScore" \
+        -Dexec.args="--runner=DataflowRunner \
+                     --input=$GCP_INPUT_FILE \
+                     --output=$GCP_OUTPUT_FILE \
+                     --project=$GCP_PROJECT"
+
+    mvn clean package exec:java -Pflink-runner \
+        -Dexec.mainClass="demo.UserScore" \
+        -Dexec.args="--runner=flink \
+                     --input=$GCP_INPUT_FILE \
+                     --output=$GCP_OUTPUT_FILE \
+                     --filesToStage=target/portability-demo-bundled-flink.jar \
+                     --flinkMaster=$FLINK_MASTER_ADDRESS"
+
+
+
+
+
 
 For all runners, batch demo shows:
 * Graph structure 
@@ -10,45 +70,18 @@ Streaming demo adds:
 * Watermarks
 
 
-## Apache Kafka cluster in Google Cloud Dataproc
-
-Set firewall rules for your GCP project to open `tcp:2181, tcp:2888, tcp:3888` for Zookeeper and `tcp:9092` for Kafka.
-	
-Upload the Dataproc config script that will install Kafka on Dataproc:
-
-    gsutil cp dataproc-config/dataproc-kafka-init.sh gs://apache-beam-demo/config/
-
-Start the Kafka cluster:
-
-    gcloud dataproc clusters create kafka \
-        --zone=us-central1-f \
-        --initialization-actions gs://apache-beam-demo/config/dataproc-kafka-init.sh \
-        --initialization-action-timeout 5m \
-        --num-workers=3 \
-        --scopes=https://www.googleapis.com/auth/cloud-platform \
-        --worker-boot-disk-size=100gb \
-        --master-boot-disk-size=500gb \
-        --master-machine-type n1-standard-4 \
-        --worker-machine-type n1-standard-4       
-
-Create a topic to use for the game:
-
-    bin/kafka-topics.sh --create --zookeeper <external ip for kafka-m>:2181 --replication-factor 1 --partitions 3 --topic game
-
-Note: The project `pom.xml` currently hard codes the external IP address for `kafka-m`, so you'll need to edit it by hand.
-
 ## Injector
 
-On a new "injector VM", install Maven (minimum 3.3.1), git, and OpenJDK 7.
+On a new "injector VM", install Maven (minimum 3.3.1), git, and OpenJDK 7. The
+injector can inject data to a Kafka Topic, a Pubsub Topic, or a local file. To
+test your own changes, you can generate a local file with data:
 
-    git clone https://github.com/davorbonaci/beam-portability-demo.git
-    cd beam-portability-demo
-Edit the pom to use the address of kafka-m.
+    mvn clean compile exec:java@injector -Dexec.args="--fileName=$BEAM_LOCAL_FILE"
 
-    screen
-    mvn clean compile exec:java@injector
+Press `Ctrl-C` when you are pleased with the amount of data generated.
 
-Press `Ctrl-A`, `Ctrl-D` (later `screen -r` to resume).
+To stream data to PubSub, use the flags `--gcpProject=$GCP_PROJECT --pubsubTopic=$PUBSUB_TOPIC` instead of `--fileName`.
+To stream data to Kafka, you may run the Injector without any arguments.
 
 ## Google Cloud Dataflow
 
@@ -72,18 +105,6 @@ Leaderboard (requires the injector):
         --scopes=https://www.googleapis.com/auth/cloud-platform \
         --worker-boot-disk-size=100gb \
         --master-boot-disk-size=100gb
-
-To view the Apache Flink UI, in another terminal:
-
-    gcloud compute ssh --zone=us-central1-f --ssh-flag="-D 1081" --ssh-flag="-N" --ssh-flag="-n" gaming-flink-m
-
-Launch magic Google Chrome window and, if applicable, set BeyondCorp to
-System/Alternative:
-
-    /Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome \
-      --proxy-server="socks5://localhost:1081" \
-      --host-resolver-rules="MAP * 0.0.0.0 , EXCLUDE localhost" \
-      --user-data-dir=/tmp/
 
 Open the UI:
 
@@ -110,7 +131,7 @@ Submit HourlyTeamScore to the cluster:
                      --outputPrefix=gs://apache-beam-demo-fjp/flink/hourly/scores \
                      --filesToStage=target/portability-demo-bundled-flink.jar \
                      --flinkMaster=gaming-flink-w-10.c.apache-beam-demo.internal:40007"
-                     
+
 Submit LeaderBoard to the cluster:
 
     mvn clean package exec:java -Pflink-runner \
@@ -122,7 +143,7 @@ Submit LeaderBoard to the cluster:
                      --topic=game \
                      --outputPrefix=gs://apache-beam-demo-fjp/flink/leader/scores \
                      --filesToStage=target/portability-demo-bundled-flink.jar \
-                     --flinkMaster=gaming-flink-w-10.c.apache-beam-demo.internal:40007"                     
+                     --flinkMaster=gaming-flink-w-10.c.apache-beam-demo.internal:40007"
 
 If you receive an error saying `Cannot resolve the JobManager hostname`, you
 may need to modify your `/etc/hosts` file to include an entry like this:
@@ -139,18 +160,6 @@ may need to modify your `/etc/hosts` file to include an entry like this:
         --master-machine-type=n1-standard-8 \
         --worker-boot-disk-size=100gb \
         --master-boot-disk-size=100gb
-
-To view the Apache Spark UI, in another terminal:
-
-    gcloud compute ssh --zone=us-central1-f --ssh-flag="-D 1080" --ssh-flag="-N" --ssh-flag="-n" gaming-spark-m
-
-Launch magic Google Chrome window and, if applicable, set BeyondCorp to
-System/Alternative:
-
-    /Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome \
-        --proxy-server="socks5://localhost:1080" \
-        --host-resolver-rules="MAP * 0.0.0.0 , EXCLUDE localhost" \
-        --user-data-dir=/tmp/
 
 Open the UI:
 
@@ -169,3 +178,31 @@ Submit the job to the cluster:
         --runner=spark \
         --outputPrefix=gs://apache-beam-demo-fjp/spark/hourly/scores \
         --input=gs://apache-beam-demo/data/gaming*
+
+
+# Extras
+
+## Apache Kafka cluster in Google Cloud Dataproc
+
+Set firewall rules for your GCP project to open `tcp:2181, tcp:2888, tcp:3888` for Zookeeper and `tcp:9092` for Kafka.
+
+Start the Kafka cluster:
+
+    gcloud dataproc clusters create kafka \
+        --zone=us-central1-f \
+        --project=$GCP_PROJECT \
+        --initialization-actions gs://apache-beam-demo/config/dataproc-kafka-init.sh \
+        --initialization-action-timeout 5m \
+        --num-workers=3 \
+        --scopes=https://www.googleapis.com/auth/cloud-platform \
+        --worker-boot-disk-size=100gb \
+        --master-boot-disk-size=500gb \
+        --master-machine-type n1-standard-4 \
+        --worker-machine-type n1-standard-4       
+
+Create a topic to use for the game:
+
+    bin/kafka-topics.sh --create --zookeeper $KAFKA_ADDRESS --replication-factor 1 --partitions 3 --topic game
+
+Note: The project `pom.xml` currently hard codes the external IP address for `kafka-m`, so you'll need to edit it by hand.
+
