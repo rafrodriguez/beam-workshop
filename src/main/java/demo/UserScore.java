@@ -145,6 +145,8 @@ public class UserScore {
 
         // Sum the score for every user.
         .apply(Sum.<String>integersPerKey())
+
+        // Format the results and write down to files.
         .apply(ToString.kvs())
         .apply(TextIO.write().to(options.getOutput()));
 

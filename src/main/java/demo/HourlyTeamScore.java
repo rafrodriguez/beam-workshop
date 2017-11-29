@@ -15,12 +15,8 @@
  */
 package demo;
 
-import java.io.Serializable;
 
-import org.apache.avro.reflect.Nullable;
 import org.apache.beam.sdk.Pipeline;
-import org.apache.beam.sdk.coders.AvroCoder;
-import org.apache.beam.sdk.coders.DefaultCoder;
 import org.apache.beam.sdk.io.FileBasedSink.FilenamePolicy;
 import org.apache.beam.sdk.io.TextIO;
 import org.apache.beam.sdk.io.fs.ResolveOptions.StandardResolveOptions;
@@ -71,49 +67,6 @@ public class HourlyTeamScore {
     @Validation.Required
     String getOutputPrefix();
     void setOutputPrefix(String value);
-  }
-
-  /** Class to hold info about a game event. */
-  @DefaultCoder(AvroCoder.class)
-  static class GameActionInfo implements Serializable {
-
-    @Nullable String user;
-    @Nullable String team;
-    @Nullable Integer score;
-    @Nullable Long timestamp;
-
-    public GameActionInfo() {}
-
-    public GameActionInfo(String user, String team, Integer score, Long timestamp) {
-      this.user = user;
-      this.team = team;
-      this.score = score;
-      this.timestamp = timestamp;
-    }
-
-    public String getUser() {
-      return this.user;
-    }
-    public String getTeam() {
-      return this.team;
-    }
-    public Integer getScore() {
-      return this.score;
-    }
-    public Long getTimestamp() {
-      return this.timestamp;
-    }
-  }
-
-  /** DoFn that keys the element by the window. */
-  public static class KeyByWindowFn
-  extends DoFn<KV<String, Integer>, KV<IntervalWindow, KV<String, Integer>>> {
-    private static final long serialVersionUID = 1L;
-
-    @ProcessElement
-    public void processElement(ProcessContext context, IntervalWindow window) {
-      context.output(KV.of(window, context.element()));
-    }
   }
 
   /** DoFn to parse raw log lines into structured GameActionInfos. */

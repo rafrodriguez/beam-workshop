@@ -29,7 +29,7 @@ _DEFAULT_PUBSUB_TOPIC=user-scores-topic
 _DEFAULT_KAFKA_IP=127.0.0.1:1234
 _DEFAULT_FLINK_MASTER=35.184.95.54:40007
 _DEFAULT_GCP_INPUT_FILE=gs://apache-beam-demo/data/gaming*
-_DEFAULT_GCP_OUTPUT_FILE=gs://$_DEFAULT_GCP_PROJECT/data/gaming*
+_DEFAULT_GCP_OUTPUT_FILE=gs://beam-workshop-outputs/$USER/gaming*
 
 function readOrDefault {
   REQUESTED_VALUE_NAME=$1

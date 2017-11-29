@@ -15,7 +15,11 @@ For this, you will need the following:
 
 ### Java / Python / Runners
 This workshop is mainly geared for Java, so you can run the exercises in
-different runners. Nonetheless, also Python examples are provided.
+different runners. 
+
+Python examples are also provided, though these only work on the 
+Direct runner and the Dataflow runner. Check out the `py/` directory
+and its `README` for the Python code.
 
 ## Getting started
 First of all, you'll need to set up the basic environment variables that you
@@ -46,6 +50,18 @@ You will need to have Maven 3.3.1+, and JDK 7+ installed. To install them:
                      --input=$GCP_INPUT_FILE \
                      --output=$GCP_OUTPUT_FILE \
                      --project=$GCP_PROJECT"
+                     
+    mvn clean package -Pspark-runner
+    gcloud dataproc jobs submit spark \
+            --project=$FCP_PROJECT \
+            --cluster gaming-spark \
+            --properties spark.default.parallelism=200 \
+            --class demo.UserScore \
+            --jars ./target/portability-demo-bundled-spark.jar \
+            -- \
+            --runner=spark \
+            --input=$GCP_INPUT_FILE \
+            --output=$GCP_OUTPUT_FILE
 
     mvn clean package exec:java -Pflink-runner \
         -Dexec.mainClass="demo.UserScore" \
