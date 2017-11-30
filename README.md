@@ -38,9 +38,21 @@ will use to run the pipelines in different runners. Run:
 
 Normally the default values will be enough, but check with the instructor to make
 sure that you get all the proper variables. Also, you will have the option to have the
-Python environment set up, and the 
+Python environment set up, and the Google Cloud SDK to access Google Cloud Storage.
 
 ## The UserScore pipeline
+We have coded a mobile game, and it's become successful! We have millions of users around the world 
+that are playing it multiple times per day. Whenever a user plays our game, they perform some
+silly repetitive action, and score points. 
+
+After every game, their score gets reported back to our data infrastructure, along with the
+user name, team name, and a time stamp for when the user played that game.
+
+We want to analyze this data. Initially, we'd like to create a pipeline that sums all the 
+points obtained by every user individually; given that we are storing comma-separated
+strings with their user name, team name, score, and timestamp.
+
+Look at the code in `src/main/java/demo/UserScore.java`.
 
     mvn clean package exec:java -Pdirect-runner \
         -Dexec.mainClass="demo.UserScore" \
@@ -65,16 +77,21 @@ Python environment set up, and the
             --input=$GCP_INPUT_FILE \
             --outputPrefix=$GCP_OUTPUT_FILE/spark/user/res
 
-    mvn clean package exec:java -Pflink-runner \
-        -Dexec.mainClass="demo.UserScore" \
-        -Dexec.args="--runner=flink \
-                     --input=$GCP_INPUT_FILE \
-                     --outputPrefix=$GCP_OUTPUT_FILE/flink/user/res \
-                     --filesToStage=target/portability-demo-bundled-flink.jar \
-                     --flinkMaster=$FLINK_MASTER_ADDRESS \
-                     --parallelism=20"
+To submit your pipeline to Flink, you will need to go into the Flink UI (http://35.194.11.109:).
+Once there, you can build the JAR for Flink, upload it through the Flink UI, and select class 
+`demo.UserScore` and pass the following arguments:
 
+    --parallelism=20 --input=gs://apache-beam-demo/data/gaming* 
+    --outputPrefix=gs://beam-workshop-outputs/yourusername/flink/user/scores
+    --runner=flink
+    
 ## The HourlyTeamScore pipeline
+Now, suppose that we want to step up our analytics. Instead of just adding up global scores,
+suppose that we want to study how much each team performed every hour instead. This means that
+we have to divide our data over two dimensions: by their timestamps, and by their team name.
+
+Look at the code in `src/main/java/demo/HourlyTeamScore.java`.
+
 
     mvn clean package exec:java -Pdirect-runner \
              -Dexec.mainClass="demo.HourlyTeamScore" \
@@ -99,17 +116,18 @@ Python environment set up, and the
             --input=$GCP_INPUT_FILE \
             --outputPrefix=$GCP_OUTPUT_FILE/spark/hourly/res
 
-        mvn clean package exec:java -Pflink-runner \
-            -Dexec.mainClass="demo.HourlyTeamScore" \
-            -Dexec.args="--runner=flink \
-                         --input=$GCP_INPUT_FILE \
-                         --outputPrefix=$GCP_OUTPUT_FILE/flink/hourly/res \
-                         --filesToStage=target/portability-demo-bundled-flink.jar \
-                         --flinkMaster=$FLINK_MASTER_ADDRESS \
-                         --parallelism=20"
+Just like the `UserScore` pipeline, you can submit this pipeline to flink via the UI, only changing
+the class to `demo.HourlyTeamScore`, and arguments:
+
+    --parallelism=20 --input=gs://apache-beam-demo/data/gaming* 
+    --outputPrefix=gs://beam-workshop-outputs/yourusername/flink/hourly/scores
+    --runner=flink
 
 ## The LeaderBoard pipeline
-This pipeline is interesting because it's our first streaming pipeline
+This pipeline is interesting because it's our first streaming pipeline. We want to keep an
+up-to-date leaderboard so that it can be displayed on our website. We want to report the 
+most up-to date results, but we also want to update them as time goes by and we get more
+data.
 
     mvn clean package exec:java -Pdirect-runner \
             -Dexec.mainClass="demo.LeaderBoard" \
@@ -123,13 +141,13 @@ This pipeline is interesting because it's our first streaming pipeline
                          --topic=projects/$GCP_PROJECT/topics/$PUBSUB_TOPIC \
                          --outputPrefix=$GCP_OUTPUT_FILE/dataflow/leader/res"
 
-    mvn clean package exec:java -Pflink-runner \
-                -Dexec.mainClass="demo.LeaderBoard" \
-                -Dexec.args="--runner=flink \
-                             --topic=projects/$GCP_PROJECT/topics/$PUBSUB_TOPIC \
-                             --outputPrefix=$GCP_OUTPUT_FILE/flink/leader/res \
-                             --parallelism=20"
+To submit this pipeline to the Flink UI, you can do the same as previous pipeline, with class
+`demo.LeaderBoard`, and arguments: 
 
+    --parallelism=20 
+    --topic=projects/$GCP_PROJECT/topics/$PUBSUB_TOPIC 
+    --outputPrefix=gs://beam-workshop-outputs/yourusername/flink/leader/board
+    --runner=flink
 
 ## Injector
 
@@ -145,19 +163,6 @@ To stream data to PubSub, use the flags `--gcpProject=$GCP_PROJECT --pubsubTopic
 To stream data to Kafka, you may run the Injector without any arguments.
 
 ## Apache Spark cluster in Google Cloud Dataproc
-
-    gcloud dataproc clusters create gaming-spark \
-        --image-version=1.0 \
-        --zone=us-central1-f \
-        --num-workers=25 \
-        --worker-machine-type=n1-standard-8 \
-        --master-machine-type=n1-standard-8 \
-        --worker-boot-disk-size=100gb \
-        --master-boot-disk-size=100gb
-
-Open the UI:
-
-    http://gaming-spark-m:18080/
 
 Submit the job to the cluster:
 
