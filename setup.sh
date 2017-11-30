@@ -73,3 +73,14 @@ case "$response"
     pip install apache-beam[gcp]
     ;;
 esac
+
+
+#####################################
+# SETTING UP GCLOUD ENVIRONMENT
+#####################################
+read -r -p "Google Cloud Command Line Interface? [y/N] " response
+case "$response"
+  in [yY][eE][sS]|[yY])
+    curl http://sdk.cloud.google.com | bash
+    ;;
+esac
