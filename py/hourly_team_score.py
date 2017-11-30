@@ -156,24 +156,16 @@ class TeamScoresDict(beam.DoFn):
     }
 
 
-class IntoHourlyWindows(beam.PTransform):
-  def __init__(self):
+class IntoWindows(beam.PTransform):
+
+  def __init__(self, duration):
     super(IntoHourlyWindows, self).__init__()
-    self.window_duration_in_seconds = 3600
+    self.window_duration_in_seconds = duration
 
   def expand(self, pcoll):
     return (
         pcoll
         | 'ParseGameEventFn' >> beam.ParDo(ParseGameEventFn())
-
-        # Filter out data before and after the given times so that it is not
-        # included in the calculations. As we collect data in batches (say, by
-        # day), the batch for the day that we want to analyze could potentially
-        # include some late-arriving data from the previous day. If so, we want
-        # to weed it out. Similarly, if we include data from the following day
-        # (to scoop up late-arriving events from the day we're analyzing), we
-        # need to weed out events that fall after the time period we want to
-        # analyze.
 
         # Add an element timestamp based on the event log, and apply fixed
         # windowing.
@@ -197,15 +189,14 @@ def run(argv=None):
                       type=str,
                       required=True,
                       help='File prefix to output results.')
+  parser.add_argument('--window_duration',
+                      type=int,
+                      default=60,
+                      help='Numeric value of fixed window duration, in minutes')
 
   args, pipeline_args = parser.parse_known_args(argv)
 
   options = PipelineOptions(pipeline_args)
-
-  if options.view_as(GoogleCloudOptions).project is None:
-    parser.print_usage()
-    print(sys.argv[0] + ': error: argument --project is required')
-    sys.exit(1)
 
   # We use the save_main_session option because one or more DoFn's in this
   # workflow rely on global context (e.g., a module imported at module level).
@@ -214,8 +205,10 @@ def run(argv=None):
   with beam.Pipeline(options=options) as p:
     (p
      | 'ReadInputText' >> beam.io.ReadFromText(args.input)
-     | 'HourlyTeamScore' >> IntoHourlyWindows()
-     | 'FormatTeamScores' >> beam.Map(lambda (team, score): 'team: %s score: %d' % (team, score))
+     | 'HourlyTeamScore' >> IntoWindows(duration=args.window_duration)
+     | 'GetKeyValuePairs' >> beam.Map(lambda score: (score['team'], score['score']))
+     | 'SumScoresPerTeam' >> beam.CombinePerKey(sum)
+     | 'FormatTeamScores' >> beam.Map(str)
      | 'WriteTeamScoreSums' >> beam.io.WriteToText(args.outputPrefix))
 
 

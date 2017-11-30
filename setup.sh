@@ -23,13 +23,14 @@ fi
 # DEFAULT VALUES FOR ENV VARIABLES
 ####################################
 _DEFAULT_GCP_PROJECT=beam-workshop-pabloem
-_DEFAULT_LOCAL_FILE=data/local_user_data.csv
+_DEFAULT_LOCAL_FILE=$PWD/data/demo-file.csv
 
-_DEFAULT_PUBSUB_TOPIC=user-scores-topic
+_DEFAULT_PUBSUB_TOPIC=bwbeta
 _DEFAULT_KAFKA_IP=127.0.0.1:1234
-_DEFAULT_FLINK_MASTER=35.184.95.54:40007
+_DEFAULT_FLINK_MASTER=35.194.11.109:40007
+_DEFAULT_SPARK_IP=35.188.104.76
 _DEFAULT_GCP_INPUT_FILE=gs://apache-beam-demo/data/gaming*
-_DEFAULT_GCP_OUTPUT_FILE=gs://beam-workshop-outputs/$USER/gaming*
+_DEFAULT_GCP_OUTPUT_FILE=gs://beam-workshop-outputs/$USER/gaming
 
 function readOrDefault {
   REQUESTED_VALUE_NAME=$1
@@ -58,13 +59,14 @@ BEAM_LOCAL_FILE=`readOrDefault "Local Input File" $_DEFAULT_LOCAL_FILE $CHANGE_A
 PUBSUB_TOPIC=`readOrDefault "PubSub Topic" $_DEFAULT_PUBSUB_TOPIC $CHANGE_ALL_VALUES`
 KAFKA_IP_ADDRESS=`readOrDefault "Kafka Cluster Address (IP+port)" $_DEFAULT_KAFKA_IP $CHANGE_ALL_VALUES`
 FLINK_MASTER_ADDRESS=`readOrDefault "Flink Cluster Address (IP+port)" $_DEFAULT_FLINK_MASTER $CHANGE_ALL_VALUES`
+SPARK_MASTER_IP=`readOrDefault "Spark Cluster IP Address (IP only)" $_DEFAULT_SPARK_IP $CHANGE_ALL_VALUES`
 
 
 #####################################
 # SETTING UP PYTHON ENVIRONMENT
 #####################################
 read -r -p "Setup Python Environment? [y/N] " response
-case "$response" 
+case "$response"
   in [yY][eE][sS]|[yY])
     pip install virtualenv && virtualenv .venv
     source .venv/bin/activate

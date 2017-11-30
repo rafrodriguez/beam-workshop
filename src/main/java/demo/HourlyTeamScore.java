@@ -93,7 +93,7 @@ public class HourlyTeamScore {
     }
   }
 
-  private static class SetTimestampFn
+  public static class SetTimestampFn
   implements SerializableFunction<String, Instant> {
     @Override
     public Instant apply(String input) {
@@ -196,6 +196,6 @@ public class HourlyTeamScore {
 
     .apply("TeamScores", new CalculateTeamScores(options.getOutputPrefix()));
 
-    pipeline.run();
+    pipeline.run().waitUntilFinish();
   }
 }

@@ -120,8 +120,8 @@ public class UserScore {
     // Set this required option to specify where to write the output.
     @Description("Path of the file to write to.")
     @Validation.Required
-    String getOutput();
-    void setOutput(String value);
+    String getOutputPrefix();
+    void setOutputPrefix(String value);
   }
 
   /**
@@ -148,7 +148,7 @@ public class UserScore {
 
         // Format the results and write down to files.
         .apply(ToString.kvs())
-        .apply(TextIO.write().to(options.getOutput()));
+        .apply(TextIO.write().to(options.getOutputPrefix()));
 
     // Run the batch pipeline.
     pipeline.run().waitUntilFinish();

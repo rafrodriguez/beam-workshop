@@ -15,11 +15,15 @@
  */
 package demo;
 
+import demo.UserScore.ParseEventFn;
 import org.apache.beam.sdk.Pipeline;
 import org.apache.beam.sdk.coders.NullableCoder;
 import org.apache.beam.sdk.coders.StringUtf8Coder;
+import org.apache.beam.sdk.io.gcp.pubsub.PubsubIO;
 import org.apache.beam.sdk.io.kafka.KafkaIO;
 import org.apache.beam.sdk.io.kafka.KafkaRecord;
+import org.apache.beam.sdk.metrics.Counter;
+import org.apache.beam.sdk.metrics.Metrics;
 import org.apache.beam.sdk.options.Default;
 import org.apache.beam.sdk.options.Description;
 import org.apache.beam.sdk.options.PipelineOptionsFactory;
@@ -27,6 +31,7 @@ import org.apache.beam.sdk.options.StreamingOptions;
 import org.apache.beam.sdk.transforms.DoFn;
 import org.apache.beam.sdk.transforms.ParDo;
 import org.apache.beam.sdk.transforms.SerializableFunction;
+import org.apache.beam.sdk.transforms.WithTimestamps;
 import org.apache.beam.sdk.transforms.windowing.AfterPane;
 import org.apache.beam.sdk.transforms.windowing.AfterProcessingTime;
 import org.apache.beam.sdk.transforms.windowing.AfterWatermark;
@@ -36,8 +41,8 @@ import org.apache.beam.sdk.values.KV;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.joda.time.Duration;
 import org.joda.time.Instant;
-
-import demo.HourlyTeamScore.GameActionInfo;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * This class is the third in a series of four pipelines that tell a story in a 'gaming' domain,
@@ -80,7 +85,6 @@ import demo.HourlyTeamScore.GameActionInfo;
  */
 public class LeaderBoard extends HourlyTeamScore {
 
-  private static final String TIMESTAMP_ATTRIBUTE = "timestamp_ms";
   static final Duration TWO_MINUTES = Duration.standardMinutes(2);
   static final Duration FIVE_MINUTES = Duration.standardMinutes(5);
   static final Duration TEN_MINUTES = Duration.standardMinutes(10);
@@ -91,30 +95,6 @@ public class LeaderBoard extends HourlyTeamScore {
     @Default.String("game")
     String getTopic();
     void setTopic(String value);
-
-    @Description("Kafka Bootstrap Server")
-    String getKafkaBootstrapServer();
-    void setKafkaBootstrapServer(String value);
-  }
-
-  private static class SetTimestampFn
-  implements SerializableFunction<KV<String, String>, Instant> {
-    @Override
-    public Instant apply(KV<String, String> input) {
-      String[] components = input.getValue().split(",");
-      try {
-        return new Instant(Long.parseLong(components[3].trim()));
-      } catch (ArrayIndexOutOfBoundsException | NumberFormatException e) {
-        return Instant.now();
-      }
-    }
-  }
-
-  static class ValuesFn extends DoFn<KafkaRecord<String, String>, String> {
-    @ProcessElement
-    public void processElement(ProcessContext c) {
-      c.output(c.element().getKV().getValue());
-    }
   }
 
   public static void main(String[] args) throws Exception {
@@ -124,14 +104,11 @@ public class LeaderBoard extends HourlyTeamScore {
     Pipeline pipeline = Pipeline.create(options);
 
     pipeline
-    .apply(KafkaIO.<String, String>read()
-        .withBootstrapServers(options.getKafkaBootstrapServer())
-        .withTopic(options.getTopic())
-        .withKeyDeserializer(StringDeserializer.class)
-        .withValueDeserializer(StringDeserializer.class)
-        .withTimestampFn(new SetTimestampFn()))
-    .apply("Values", ParDo.of(new ValuesFn()))
-
+    .apply(PubsubIO.readStrings()
+        .withTimestampAttribute("timestamp_ms")
+        .fromTopic(options.getTopic()))
+    .apply("SetTimestamps", WithTimestamps.of(new SetTimestampFn()))
+    //.apply("FixedWindows", Window.<String>into(FixedWindows.of(ONE_HOUR)))
     .apply("FixedWindows", Window.<String>into(FixedWindows.of(FIVE_MINUTES))
         .triggering(AfterWatermark.pastEndOfWindow()
             .withEarlyFirings(AfterProcessingTime.pastFirstElementInPane()

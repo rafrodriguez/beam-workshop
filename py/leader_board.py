@@ -73,7 +73,6 @@ python leader_board.py \
 python leader_board.py \
     --project $PROJECT_ID \
     --topic projects/$PROJECT_ID/topics/$PUBSUB_TOPIC \
-    --dataset $BIGQUERY_DATASET \
     --runner DataflowRunner \
     --temp_location gs://$BUCKET/user_score/temp
 
@@ -171,44 +170,6 @@ class TeamScoresDict(beam.DoFn):
     }
 
 
-class WriteToBigQuery(beam.PTransform):
-  """Generate, format, and write BigQuery table row information."""
-  def __init__(self, table_name, dataset, schema):
-    """Initializes the transform.
-    Args:
-      table_name: Name of the BigQuery table to use.
-      dataset: Name of the dataset to use.
-      schema: Dictionary in the format {'column_name': 'bigquery_type'}
-    """
-    super(WriteToBigQuery, self).__init__()
-    self.table_name = table_name
-    self.dataset = dataset
-    self.schema = schema
-
-  def get_schema(self):
-    """Build the output table schema."""
-    return ', '.join(
-        '%s:%s' % (col, self.schema[col]) for col in self.schema)
-
-  def get_table(self, pipeline):
-    """Utility to construct an output table reference."""
-    project = pipeline.options.view_as(GoogleCloudOptions).project
-    return '%s:%s.%s' % (project, self.dataset, self.table_name)
-
-  def expand(self, pcoll):
-    table = self.get_table(pcoll.pipeline)
-    return (
-        pcoll
-        | 'ConvertToRow' >> beam.Map(
-            lambda elem: {col: elem[col] for col in self.schema})
-        | beam.io.Write(beam.io.BigQuerySink(
-            table,
-            schema=self.get_schema(),
-            create_disposition=beam.io.BigQueryDisposition.CREATE_IF_NEEDED,
-            write_disposition=beam.io.BigQueryDisposition.WRITE_APPEND)))
-
-
-# [START window_and_trigger]
 class CalculateTeamScores(beam.PTransform):
   """Calculates scores for each team within the configured window duration.
 
@@ -235,10 +196,8 @@ class CalculateTeamScores(beam.PTransform):
             accumulation_mode=trigger.AccumulationMode.ACCUMULATING)
         # Extract and sum teamname/score pairs from the event data.
         | 'ExtractAndSumScore' >> ExtractAndSumScore('team'))
-# [END window_and_trigger]
 
 
-# [START processing_time_trigger]
 class CalculateUserScores(beam.PTransform):
   """Extract user/score pairs from the event stream using processing time, via
   global windowing. Get periodic updates on all users' running scores.
@@ -260,7 +219,6 @@ class CalculateUserScores(beam.PTransform):
             accumulation_mode=trigger.AccumulationMode.ACCUMULATING)
         # Extract and sum username/score pairs from the event data.
         | 'ExtractAndSumScore' >> ExtractAndSumScore('user'))
-# [END processing_time_trigger]
 
 
 def run(argv=None):
@@ -271,14 +229,6 @@ def run(argv=None):
                       type=str,
                       required=True,
                       help='Pub/Sub topic to read from')
-  parser.add_argument('--dataset',
-                      type=str,
-                      required=True,
-                      help='BigQuery Dataset to write tables to. '
-                      'Must already exist.')
-  parser.add_argument('--table_name',
-                      default='leader_board',
-                      help='The BigQuery table name. Should not already exist.')
   parser.add_argument('--team_window_duration',
                       type=int,
                       default=60,
@@ -289,15 +239,14 @@ def run(argv=None):
                       default=120,
                       help='Numeric value of allowed data lateness, in minutes')
 
+  parser.add_argument('--output',
+                      type=str,
+                      required=True,
+                      help='The file to output results into.')
+
   args, pipeline_args = parser.parse_known_args(argv)
 
   options = PipelineOptions(pipeline_args)
-
-  # We also require the --project option to access --dataset
-  if options.view_as(GoogleCloudOptions).project is None:
-    parser.print_usage()
-    print(sys.argv[0] + ': error: argument --project is required')
-    sys.exit(1)
 
   # We use the save_main_session option because one or more DoFn's in this
   # workflow rely on global context (e.g., a module imported at module level).
@@ -321,27 +270,8 @@ def run(argv=None):
      | 'CalculateTeamScores' >> CalculateTeamScores(
          args.team_window_duration, args.allowed_lateness)
      | 'TeamScoresDict' >> beam.ParDo(TeamScoresDict())
-     | 'WriteTeamScoreSums' >> WriteToBigQuery(
-         args.table_name + '_teams', args.dataset, {
-             'team': 'STRING',
-             'total_score': 'INTEGER',
-             'window_start': 'STRING',
-             'processing_time': 'STRING',
-         }))
-
-    def format_user_score_sums(user_score):
-      (user, score) = user_score
-      return {'user': user, 'total_score': score}
-
-    # Get user scores and write the results to BigQuery
-    (events  # pylint: disable=expression-not-assigned
-     | 'CalculateUserScores' >> CalculateUserScores(args.allowed_lateness)
-     | 'FormatUserScoreSums' >> beam.Map(format_user_score_sums)
-     | 'WriteUserScoreSums' >> WriteToBigQuery(
-         args.table_name + '_users', args.dataset, {
-             'user': 'STRING',
-             'total_score': 'INTEGER',
-         }))
+     | 'FormatOutput' >> beam.Map(lambda x: str((x['team'], x['total_score'])))
+     | 'WriteLeaderBoard' >> beam.io.WriteToText(args.output))
 
 
 if __name__ == '__main__':
