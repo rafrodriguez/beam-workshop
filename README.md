@@ -71,19 +71,17 @@ Look at the code in `src/main/java/demo/UserScore.java`.
                      --project=$GCP_PROJECT"
                      
     mvn clean package -Pspark-runner
-    gcloud dataproc jobs submit spark \
-            --project=$GCP_PROJECT \
-            --cluster gaming-spark \
+    # Submit your jar to your cluster / spark installation
+    spark-submit \
             --properties spark.default.parallelism=200 \
             --class demo.UserScore \
-            --jars ./target/portability-demo-bundled-spark.jar \
-            -- \
+            ./target/portability-demo-bundled-spark.jar \
             --runner=spark \
             --input=$GCP_INPUT_FILE \
             --outputPrefix=$GCP_OUTPUT_FILE/spark/user/res
 
 To submit your pipeline to Flink, you will need to go into the Flink UI (http://35.194.11.109:).
-Once there, you can build the JAR for Flink, upload it through the Flink UI, and select class 
+Once there, you can build the JAR for Flink (`mvn clean package -Pflinkk-runner`), upload it through the Flink UI, and select class 
 `demo.UserScore` and pass the following arguments:
 
     --parallelism=20 --input=gs://apache-beam-demo/data/gaming* 
@@ -109,17 +107,14 @@ Look at the code in `src/main/java/demo/HourlyTeamScore.java`.
                          --outputPrefix=$GCP_OUTPUT_FILE/dataflow/hourly/res \
                          --project=$GCP_PROJECT"
 
-     mvn clean package -Pspark-runner
-     gcloud dataproc jobs submit spark \
-            --project=$GCP_PROJECT \
-            --cluster gaming-spark \
+    mvn clean package -Pspark-runner
+    spark-submit \
             --properties spark.default.parallelism=200 \
             --class demo.HourlyTeamScore \
-            --jars ./target/portability-demo-bundled-spark.jar \
-            -- \
+            ./target/portability-demo-bundled-spark.jar \
             --runner=spark \
             --input=$GCP_INPUT_FILE \
-            --outputPrefix=$GCP_OUTPUT_FILE/spark/hourly/res
+            --outputPrefix=$GCP_OUTPUT_FILE/spark/user/res
 
 Just like the `UserScore` pipeline, you can submit this pipeline to flink via the UI, only changing
 the class to `demo.HourlyTeamScore`, and arguments:
@@ -166,19 +161,3 @@ Press `Ctrl-C` when you are pleased with the amount of data generated.
 
 To stream data to PubSub, use the flags `--gcpProject=$GCP_PROJECT --pubsubTopic=$PUBSUB_TOPIC` instead of `--fileName`.
 To stream data to Kafka, you may run the Injector without any arguments.
-
-## Apache Spark cluster in Google Cloud Dataproc
-
-Submit the job to the cluster:
-
-    mvn clean package -Pspark-runner
-
-    gcloud dataproc jobs submit spark \
-        --cluster gaming-spark \
-        --properties spark.default.parallelism=200 \
-        --class demo.HourlyTeamScore \
-        --jars ./target/portability-demo-bundled-spark.jar \
-        -- \
-        --runner=spark \
-        --outputPrefix=gs://apache-beam-demo-fjp/spark/hourly/scores \
-        --input=gs://apache-beam-demo/data/gaming*
