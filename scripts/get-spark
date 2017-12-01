@@ -1,0 +1,6 @@
+pushd `mktemp -d`
+wget https://archive.apache.org/dist/spark/spark-1.6.0/spark-1.6.0-bin-hadoop2.6.tgz
+tar xvf spark-1.6.0-bin-hadoop2.6.tgz
+rm spark-1.6.0-bin-hadoop2.6.tgz
+PATH=$PATH:$PWD/spark-1.6.0-bin-hadoop2.6/bin
+popd

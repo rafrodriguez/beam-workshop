@@ -73,12 +73,11 @@ Look at the code in `src/main/java/demo/UserScore.java`.
     mvn clean package -Pspark-runner
     # Submit your jar to your cluster / spark installation
     spark-submit \
-            --properties spark.default.parallelism=200 \
             --class demo.UserScore \
-            ./target/portability-demo-bundled-spark.jar \
-            --runner=spark \
-            --input=$GCP_INPUT_FILE \
-            --outputPrefix=$GCP_OUTPUT_FILE/spark/user/res
+            ./target/portability-demo-bundled-spark.jar 
+            --runner=SparkRunner 
+            --input=data/demo-file.csv         
+            --outputPrefix=data/userScore
 
 To submit your pipeline to Flink, you will need to go into the Flink UI (http://35.194.11.109:).
 Once there, you can build the JAR for Flink (`mvn clean package -Pflinkk-runner`), upload it through the Flink UI, and select class 
@@ -109,12 +108,11 @@ Look at the code in `src/main/java/demo/HourlyTeamScore.java`.
 
     mvn clean package -Pspark-runner
     spark-submit \
-            --properties spark.default.parallelism=200 \
             --class demo.HourlyTeamScore \
-            ./target/portability-demo-bundled-spark.jar \
-            --runner=spark \
-            --input=$GCP_INPUT_FILE \
-            --outputPrefix=$GCP_OUTPUT_FILE/spark/user/res
+            ./target/portability-demo-bundled-spark.jar 
+            --runner=SparkRunner 
+            --input=data/demo-file.csv         
+            --outputPrefix=data/hourlyTeamScore
 
 Just like the `UserScore` pipeline, you can submit this pipeline to flink via the UI, only changing
 the class to `demo.HourlyTeamScore`, and arguments:
