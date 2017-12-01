@@ -40,6 +40,11 @@ Normally the default values will be enough, but check with the instructor to mak
 sure that you get all the proper variables. Also, you will have the option to have the
 Python environment set up, and the Google Cloud SDK to access Google Cloud Storage.
 
+### Checking the results of your pipelines
+If you use the provided `$GCP_OUTPUT_FILE` to output the results of your pipeline, you 
+should be able to use `gsutil ls $GCP_OUTPUT_FILE` to see the results of your jobs, as
+well as other file commands.
+
 ## The UserScore pipeline
 We have coded a mobile game, and it's become successful! We have millions of users around the world 
 that are playing it multiple times per day. Whenever a user plays our game, they perform some

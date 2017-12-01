@@ -2,6 +2,11 @@
 This Readme file is for the Python version of the Apache Beam workshop.
 Before starting, make sure to run the `setup.sh` script in the parent directory.
 
+### Checking the results of your pipelines
+If you use the provided `$GCP_OUTPUT_FILE` to output the results of your pipeline, you 
+should be able to use `gsutil ls $GCP_OUTPUT_FILE` to see the results of your jobs, as
+well as other file commands.
+
 
 ## User scores pipeline
 
