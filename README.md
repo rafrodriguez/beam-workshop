@@ -96,7 +96,7 @@ Look at the code in `src/main/java/demo/UserScore.java`.
             --input=$GCP_INPUT_FILE \
             --outputPrefix=$GCP_OUTPUT_FILE/spark/user/res
 
-To submit your pipeline to Flink, you will need to go into the Flink UI (http://35.194.11.109:).
+To submit your pipeline to Flink, you will need to go into the Flink UI (http://35.194.11.109:33114/#/submit).
 Once there, you can build the JAR for Flink (`mvn clean package -Pflinkk-runner`), upload it through the Flink UI, and select class 
 `demo.UserScore` and pass the following arguments:
 
