@@ -21,11 +21,7 @@ import org.apache.beam.sdk.Pipeline;
 import org.apache.beam.sdk.io.TextIO;
 import org.apache.beam.sdk.metrics.Counter;
 import org.apache.beam.sdk.metrics.Metrics;
-import org.apache.beam.sdk.options.Default;
-import org.apache.beam.sdk.options.Description;
-import org.apache.beam.sdk.options.PipelineOptions;
 import org.apache.beam.sdk.options.PipelineOptionsFactory;
-import org.apache.beam.sdk.options.Validation;
 import org.apache.beam.sdk.transforms.DoFn;
 import org.apache.beam.sdk.transforms.ParDo;
 import org.apache.beam.sdk.transforms.Sum;
@@ -104,32 +100,12 @@ public class UserScore {
     }
   }
 
-
-  /**
-   * Options supported by {@link UserScore}.
-   */
-  public interface Options extends PipelineOptions {
-
-    @Description("Path to the data file(s) containing game data.")
-    // The default maps to two large Google Cloud Storage files (each ~12GB) holding two subsequent
-    // day's worth (roughly) of data.
-    @Default.String("gs://apache-beam-samples/game/gaming_data*.csv")
-    String getInput();
-    void setInput(String value);
-
-    // Set this required option to specify where to write the output.
-    @Description("Path of the file to write to.")
-    @Validation.Required
-    String getOutputPrefix();
-    void setOutputPrefix(String value);
-  }
-
   /**
    * Run a batch pipeline.
    */
   public static void main(String[] args) throws Exception {
     // Begin constructing a pipeline configured by commandline flags.
-    Options options = PipelineOptionsFactory.fromArgs(args).withValidation().as(Options.class);
+    BatchOptions options = PipelineOptionsFactory.fromArgs(args).withValidation().as(BatchOptions.class);
     Pipeline pipeline = Pipeline.create(options);
     LOG.info("pipeline options: " + options.toString());
 

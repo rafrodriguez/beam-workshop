@@ -23,11 +23,7 @@ import org.apache.beam.sdk.io.fs.ResolveOptions.StandardResolveOptions;
 import org.apache.beam.sdk.io.fs.ResourceId;
 import org.apache.beam.sdk.metrics.Counter;
 import org.apache.beam.sdk.metrics.Metrics;
-import org.apache.beam.sdk.options.Default;
-import org.apache.beam.sdk.options.Description;
-import org.apache.beam.sdk.options.PipelineOptions;
 import org.apache.beam.sdk.options.PipelineOptionsFactory;
-import org.apache.beam.sdk.options.Validation;
 import org.apache.beam.sdk.transforms.DoFn;
 import org.apache.beam.sdk.transforms.PTransform;
 import org.apache.beam.sdk.transforms.ParDo;
@@ -53,21 +49,6 @@ import org.slf4j.LoggerFactory;
 public class HourlyTeamScore {
 
   static final Duration ONE_HOUR = Duration.standardMinutes(60);
-
-  public interface Options extends PipelineOptions {
-
-    @Description("Path to the data file(s) containing game data.")
-    // The default maps to two large Google Cloud Storage files (each ~12GB) holding two subsequent
-    // day's worth (roughly) of data.
-    @Default.String("gs://apache-beam-samples/game/gaming_data*.csv")
-    String getInput();
-    void setInput(String value);
-
-    @Description("Output file prefix")
-    @Validation.Required
-    String getOutputPrefix();
-    void setOutputPrefix(String value);
-  }
 
   /** DoFn to parse raw log lines into structured GameActionInfos. */
   static class ParseEventFn extends DoFn<String, GameActionInfo> {
@@ -183,8 +164,8 @@ public class HourlyTeamScore {
   /** Run a batch pipeline to calculate hourly team scores. */
   public static void main(String[] args) throws Exception {
 
-    Options options =
-        PipelineOptionsFactory.fromArgs(args).withValidation().as(Options.class);
+    BatchOptions options =
+        PipelineOptionsFactory.fromArgs(args).withValidation().as(BatchOptions.class);
     Pipeline pipeline = Pipeline.create(options);
 
     pipeline

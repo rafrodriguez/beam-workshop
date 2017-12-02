@@ -15,6 +15,7 @@
  */
 package demo;
 
+import com.google.api.gax.grpc.Batch;
 import demo.UserScore.ParseEventFn;
 import org.apache.beam.sdk.Pipeline;
 import org.apache.beam.sdk.coders.NullableCoder;
@@ -90,7 +91,7 @@ public class LeaderBoard extends HourlyTeamScore {
   static final Duration TEN_MINUTES = Duration.standardMinutes(10);
 
 
-  interface Options extends HourlyTeamScore.Options, StreamingOptions {
+  interface Options extends BatchOptions, StreamingOptions {
     @Description("Topic to read from")
     @Default.String("game")
     String getTopic();
