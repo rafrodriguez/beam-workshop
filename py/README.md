@@ -8,6 +8,12 @@ should be able to use `gsutil ls $GCP_OUTPUT_FILE` to see the results of your jo
 well as other file commands.
 
 
+## Getting started pipeline
+This file is for you to iterate over your solutions. You can use the Maven 
+commands that we will use for other pipelines, except you'll just need to 
+substitute the class to `-Dexec.mainClass="demo.GettingStarted"`.
+
+
 ## User scores pipeline
 
 We have coded a mobile game, and it's become successful! We have millions of users around the world 

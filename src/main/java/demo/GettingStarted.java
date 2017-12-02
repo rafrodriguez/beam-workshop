@@ -40,11 +40,8 @@ public class GettingStarted {
         // PCollection<GameActionInfo> parsedRecords = userRecords.apply(ParDo.of(new ParseFn))
 
         // Extract username/score pairs from the event data.
-        // PCollection<KV<String, Integer>> = parsedRecords.apply(ParDo.of(new KeyScoreByUserFn()))
 
         // Sum the score for every user.
-        //PCollection<KV<String, Iterable<Integer>>> groupedScores = userScorePairs.apply(GroupByKey.create())
-        //PCollection<KV<String, Integer>> finalScores = groupedScores.apply(ParDo.of(new SumScoresDoFn()));
 
         // Format the results and write down to files.
         //PCollection<KV<String, Integer>, String> formattedPairs = finalScores.apply(ToString.kvs())

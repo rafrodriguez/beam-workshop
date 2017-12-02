@@ -45,6 +45,11 @@ If you use the provided `$GCP_OUTPUT_FILE` to output the results of your pipelin
 should be able to use `gsutil ls $GCP_OUTPUT_FILE` to see the results of your jobs, as
 well as other file commands.
 
+## The GettingStarted pipeline
+This file is for you to iterate over your solutions. You can use the Maven commands
+that we will use for other pipelines, except you'll just need to substitute the
+class to `-Dexec.mainClass="demo.GettingStarted"`.
+
 ## The UserScore pipeline
 We have coded a mobile game, and it's become successful! We have millions of users around the world 
 that are playing it multiple times per day. Whenever a user plays our game, they perform some
